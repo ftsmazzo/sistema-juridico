@@ -96,6 +96,11 @@ async function processarItem(
       polosPassivos: item.polosPassivos ?? null,
       urlDocumento: item.urlDocumento ?? null,
       identificadorDocumento: identificadorDocumento || null,
+      resumo: item.resumo ?? null,
+      baseLegal: item.baseLegal ?? null,
+      prazoDiasUteisSugerido: item.prazoDiasUteisSugerido ?? null,
+      observacoesIa: item.observacoesIa ?? null,
+      movimentacoes: item.movimentacoes ?? null,
     })
     .returning({ id: publicacoesOab.id });
 

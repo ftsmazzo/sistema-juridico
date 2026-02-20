@@ -132,6 +132,11 @@ export const publicacoesOab = pgTable(
     polosPassivos: jsonb("polos_passivos").$type<string[]>(),
     urlDocumento: varchar("url_documento", { length: 500 }),
     identificadorDocumento: varchar("identificador_documento", { length: 100 }),
+    resumo: text("resumo"),
+    baseLegal: varchar("base_legal", { length: 255 }),
+    prazoDiasUteisSugerido: integer("prazo_dias_uteis_sugerido"),
+    observacoesIa: text("observacoes_ia"),
+    movimentacoes: jsonb("movimentacoes").$type<{ tipo: string; resumo: string }[]>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [

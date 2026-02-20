@@ -36,6 +36,12 @@ export type ItemPublicacaoOab = {
   polosPassivos?: string[];
   urlDocumento?: string;
   identificadorDocumento?: string;
+  // Campos enriquecidos pela IA (workflow N8N)
+  resumo?: string;
+  baseLegal?: string;
+  prazoDiasUteisSugerido?: number;
+  observacoesIa?: string;
+  movimentacoes?: { tipo: string; resumo: string }[];
   // Quando isRecorteDigital === false
   publicacoes?: unknown[];
   mensagem?: string;

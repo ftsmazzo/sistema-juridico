@@ -1,11 +1,11 @@
 import pg from "pg";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 
 /**
- * Executa a migração inicial (0000_initial.sql).
- * Idempotente: usa CREATE TABLE IF NOT EXISTS.
- * Chamado na subida da API para criar tabelas automaticamente no deploy.
+ * Executa todas as migrações em drizzle/*.sql em ordem alfabética.
+ * Idempotente: 0000 usa CREATE IF NOT EXISTS; demais usam ADD COLUMN IF NOT EXISTS.
+ * Chamado na subida da API (deploy EasyPanel / GitHub).
  */
 export async function runMigrations(): Promise<void> {
   const url = process.env.DATABASE_URL;
@@ -15,16 +15,22 @@ export async function runMigrations(): Promise<void> {
   }
 
   const pool = new pg.Pool({ connectionString: url });
+  const dir = join(process.cwd(), "drizzle");
 
   try {
-    const pathSql = join(process.cwd(), "drizzle", "0000_initial.sql");
-    const sql = readFileSync(pathSql, "utf-8");
-    await pool.query(sql);
-    console.log("Migração 0000_initial executada.");
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    for (const file of files) {
+      const pathSql = join(dir, file);
+      const sql = readFileSync(pathSql, "utf-8");
+      await pool.query(sql);
+      console.log(`Migração ${file} executada.`);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("ENOENT")) {
-      console.warn("Arquivo de migração não encontrado (drizzle/0000_initial.sql); ignorando.");
+      console.warn("Pasta drizzle/ ou arquivos não encontrados; ignorando.");
       return;
     }
     throw err;

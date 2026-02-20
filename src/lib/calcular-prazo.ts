@@ -1,6 +1,8 @@
+import { isDiaUtil } from "./feriados.js";
+
 /**
  * Calcula a data do prazo em dias úteis a partir da data de publicação.
- * Considera apenas segunda a sexta.
+ * Considera segunda a sexta e exclui feriados nacionais (lista em feriados.ts).
  */
 export function adicionarDiasUteis(
   dataStr: string,
@@ -12,8 +14,7 @@ export function adicionarDiasUteis(
   let restante = dias;
   while (restante > 0) {
     data.setDate(data.getDate() + 1);
-    const dia = data.getDay();
-    if (dia !== 0 && dia !== 6) restante--;
+    if (isDiaUtil(data)) restante--;
   }
   return data;
 }
