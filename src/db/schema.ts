@@ -45,6 +45,10 @@ export const prazos = pgTable("prazos", {
     () => publicacoesOab.id,
     { onDelete: "set null" }
   ),
+  movimentacaoId: integer("movimentacao_id").references(
+    () => movimentacoes.id,
+    { onDelete: "set null" }
+  ),
   numeroProcesso: varchar("numero_processo", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -148,15 +152,71 @@ export const publicacoesOab = pgTable(
   ]
 );
 
+// --- Movimentações (extraídas da publicação pela IA; uma publicação pode ter N) ---
+export const movimentacoes = pgTable("movimentacoes", {
+  id: serial("id").primaryKey(),
+  publicacaoOabId: integer("publicacao_oab_id")
+    .notNull()
+    .references(() => publicacoesOab.id, { onDelete: "cascade" }),
+  tipo: varchar("tipo", { length: 100 }).notNull(), // Decisão, Intimação, etc.
+  resumo: text("resumo"),
+  ordem: integer("ordem").notNull().default(1),
+  prazoDiasUteis: integer("prazo_dias_uteis"), // sugerido pela IA
+  dataLimite: date("data_limite"), // calculada a partir da data da publicação
+  baseLegal: varchar("base_legal", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// --- Análise IA da publicação (1:1; preserva resumo, observações e resposta completa) ---
+export const analiseIaPublicacao = pgTable("analise_ia_publicacao", {
+  id: serial("id").primaryKey(),
+  publicacaoOabId: integer("publicacao_oab_id")
+    .notNull()
+    .unique()
+    .references(() => publicacoesOab.id, { onDelete: "cascade" }),
+  resumo: text("resumo"),
+  observacoesIa: text("observacoes_ia"),
+  baseLegalGeral: varchar("base_legal_geral", { length: 255 }),
+  respostaCompleta: jsonb("resposta_completa").$type<{
+    resumo?: string;
+    baseLegal?: string;
+    prazoDiasUteisSugerido?: number;
+    observacoesIa?: string;
+    movimentacoes?: { tipo: string; resumo: string }[];
+  }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relações
 export const prazosRelations = relations(prazos, ({ one, many }) => ({
   publicacaoOab: one(publicacoesOab, {
     fields: [prazos.publicacaoOabId],
     references: [publicacoesOab.id],
   }),
+  movimentacao: one(movimentacoes, {
+    fields: [prazos.movimentacaoId],
+    references: [movimentacoes.id],
+  }),
   prazosUsuarios: many(prazosUsuarios),
 }));
 
-export const publicacoesOabRelations = relations(publicacoesOab, ({ many }) => ({
+export const movimentacoesRelations = relations(movimentacoes, ({ one, many }) => ({
+  publicacaoOab: one(publicacoesOab, {
+    fields: [movimentacoes.publicacaoOabId],
+    references: [publicacoesOab.id],
+  }),
   prazos: many(prazos),
+}));
+
+export const analiseIaPublicacaoRelations = relations(analiseIaPublicacao, ({ one }) => ({
+  publicacaoOab: one(publicacoesOab, {
+    fields: [analiseIaPublicacao.publicacaoOabId],
+    references: [publicacoesOab.id],
+  }),
+}));
+
+export const publicacoesOabRelations = relations(publicacoesOab, ({ one, many }) => ({
+  prazos: many(prazos),
+  movimentacoes: many(movimentacoes),
+  analiseIa: one(analiseIaPublicacao),
 }));
