@@ -25,4 +25,7 @@ Thumbs.db
 *.swp
 *.swo
 
+# Arquivo muito grande (evitar novo push)
+antigo/cron-test.txt
+
 # Optional: keep antigo as-is
