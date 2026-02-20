@@ -196,11 +196,18 @@ export async function handlePublicacoesOab(req: Request, res: Response) {
     Array.isArray((body as { publicacoes: unknown }).publicacoes)
   ) {
     itens = (body as { publicacoes: ItemPublicacaoOab[] }).publicacoes;
+  } else if (
+    body &&
+    typeof body === "object" &&
+    !Array.isArray(body) &&
+    ("isRecorteDigital" in body || "emailId" in body || "numeroProcesso" in body)
+  ) {
+    itens = [ body as ItemPublicacaoOab ];
   } else {
     res.status(400).json({
       ok: false,
       error:
-        "Body must be an array of publication items, or { \"publicacoes\": [ ... ] }",
+        "Body must be an array, { \"publicacoes\": [ ... ] }, or a single publication object",
     });
     return;
   }
