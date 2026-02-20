@@ -182,7 +182,9 @@ async function processarItem(
     }
   }
 
-  if (prazoIds.length === 0) {
+  // Fallback: prazo genérico só quando a publicação é intimação mas a IA não retornou movimentações
+  // (quando a IA retornou movimentações e disse 0 dias, ex. "ciência sem prazo", não inventamos prazo)
+  if (prazoIds.length === 0 && movs.length === 0) {
     const tipoNorm = (item.tipoPublicacao ?? "").toLowerCase();
     const ehIntimacaoPub =
       tipoNorm.includes("intimação") || tipoNorm.includes("intimacao");
