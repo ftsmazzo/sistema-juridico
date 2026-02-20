@@ -67,7 +67,9 @@ POST /api/webhooks/publicacoes-oab
 Content-Type: application/json
 ```
 
-**Body:** array JSON no formato acima.
+**Body:** envie **todo o array** em um único POST. Aceita:
+- **Array direto:** `[ { ... }, { ... }, ... ]`
+- **Objeto com chave:** `{ "publicacoes": [ { ... }, { ... } ] }`
 
 **Autenticação (recomendado):** header `Authorization: Bearer <token>` ou `X-Webhook-Secret: <segredo>` para evitar chamadas indevidas. O workflow deve enviar o segredo configurado no servidor.
 

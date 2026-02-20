@@ -16,6 +16,12 @@ Ou seja: **não tem nada “visual”** para o usuário. O que existe é um **se
 
 ---
 
+## Importante: envie tudo em um único POST
+
+A API recebe o **array completo** em **uma única requisição**. Você **não** precisa (e não deve) fazer um POST por publicação: monte o array com todas as publicações do e-mail (as 3, 4, 10 que forem) e envie esse array inteiro no body. A API percorre os itens e processa cada um.
+
+---
+
 ## Fluxo da integração (do e-mail até o banco)
 
 ```
@@ -56,14 +62,18 @@ A URL completa do webhook é:
 
 ### 2. No workflow do N8N (o que tem gatilho de agendamento)
 
-Depois do passo em que você **já tem o array de publicações em JSON** (o formato que você mostrou antes):
+Você envia **tudo de uma vez**: um único POST com o **array completo** (todas as publicações do e-mail, incluindo o item não-Recorte se vier no mesmo array). Não precisa enviar item por item.
 
-1. Adicione um nó **HTTP Request** (ou use um que já exista).
+Depois do passo em que você **já tem o array de publicações** (o JSON com 3, 4, 10 itens — tanto faz):
+
+1. Adicione um nó **HTTP Request**.
 2. Configure:
    - **Method:** `POST`
    - **URL:** `https://SUA-URL-AQUI/api/webhooks/publicacoes-oab`
    - **Body Content Type:** JSON
-   - **Body:** o array de publicações (a saída do passo anterior do workflow — o JSON com `isRecorteDigital`, `numeroProcesso`, `tipoPublicacao`, etc.).
+   - **Body:** o **array inteiro** de publicações. Duas opções:
+     - **Array direto:** `{{ $json }}` (ou a expressão que no seu workflow devolve o array completo).
+     - **Objeto com chave:** `{ "publicacoes": {{ JSON.stringify($json) }} }` — se no N8N for mais fácil mandar um objeto com uma propriedade `publicacoes` contendo o array, a API aceita os dois formatos.
 3. (Opcional) Quando tiver o secret no EasyPanel:
    - **Header:** `Authorization` = `Bearer SEU_SECRET`  
    ou  
@@ -71,7 +81,7 @@ Depois do passo em que você **já tem o array de publicações em JSON** (o for
 
 4. Salve e ative o workflow.
 
-Sempre que o workflow rodar (por agendamento ou quando processar um e-mail), ele envia esse JSON para a API; a API grava as publicações e cria os prazos de intimação no banco.
+A API processa **todos** os itens do array em uma única requisição: grava as publicações Recorte Digital, cria os prazos de intimação e ignora os itens com `isRecorteDigital: false`.
 
 ---
 

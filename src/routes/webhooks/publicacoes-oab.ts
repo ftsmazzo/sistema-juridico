@@ -186,15 +186,24 @@ export async function handlePublicacoesOab(req: Request, res: Response) {
     return;
   }
 
-  if (!Array.isArray(body)) {
+  let itens: ItemPublicacaoOab[];
+  if (Array.isArray(body)) {
+    itens = body as ItemPublicacaoOab[];
+  } else if (
+    body &&
+    typeof body === "object" &&
+    "publicacoes" in body &&
+    Array.isArray((body as { publicacoes: unknown }).publicacoes)
+  ) {
+    itens = (body as { publicacoes: ItemPublicacaoOab[] }).publicacoes;
+  } else {
     res.status(400).json({
       ok: false,
-      error: "Body must be an array of publication items",
+      error:
+        "Body must be an array of publication items, or { \"publicacoes\": [ ... ] }",
     });
     return;
   }
-
-  const itens = body as ItemPublicacaoOab[];
   let publicacoesRecebidas = 0;
   let publicacoesIgnoradas = 0;
   let prazosCriados = 0;
