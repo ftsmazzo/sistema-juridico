@@ -192,10 +192,16 @@ export async function handlePublicacoesOab(req: Request, res: Response) {
   } else if (
     body &&
     typeof body === "object" &&
-    "publicacoes" in body &&
-    Array.isArray((body as { publicacoes: unknown }).publicacoes)
+    "publicacoes" in body
   ) {
-    itens = (body as { publicacoes: ItemPublicacaoOab[] }).publicacoes;
+    const pub = (body as { publicacoes: unknown }).publicacoes;
+    if (Array.isArray(pub)) {
+      itens = pub as ItemPublicacaoOab[];
+    } else if (pub && typeof pub === "object" && ("isRecorteDigital" in pub || "emailId" in pub)) {
+      itens = [ pub as ItemPublicacaoOab ];
+    } else {
+      itens = [];
+    }
   } else if (
     body &&
     typeof body === "object" &&
