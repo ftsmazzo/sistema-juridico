@@ -4,8 +4,11 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
+        sans: ["Montserrat", "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "monospace"],
+      },
+      fontSize: {
+        base: ["1rem", { lineHeight: "1.5" }],
       },
       colors: {
         border: "hsl(var(--border))",

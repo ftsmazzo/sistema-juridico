@@ -12,10 +12,12 @@ const nav = [
 export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-card lg:block">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-        <span className="text-lg font-semibold tracking-tight text-foreground">
-          Agenda Prazos
-        </span>
+      <div className="flex h-20 items-center justify-center border-b border-border px-4 py-3">
+        <img
+          src="/logo.png"
+          alt="Lourenço & Najm - Sociedade de Advogados"
+          className="max-h-14 w-full object-contain object-center"
+        />
       </div>
       <nav className="space-y-0.5 p-4">
         {nav.map(({ to, label, Icon }) => (

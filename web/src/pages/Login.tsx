@@ -4,11 +4,13 @@ export function Login() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-sm space-y-8 rounded-2xl border border-border bg-card p-8 shadow-lg">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Agenda Prazos
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+        <div className="flex flex-col items-center text-center">
+          <img
+            src="/logo.png"
+            alt="Lourenço & Najm"
+            className="max-h-16 w-full max-w-[220px] object-contain"
+          />
+          <p className="mt-4 text-sm text-muted-foreground">
             Entre com seu usuário para acessar o sistema.
           </p>
         </div>
