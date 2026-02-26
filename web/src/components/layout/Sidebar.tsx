@@ -12,11 +12,11 @@ const nav = [
 export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-card lg:block">
-      <div className="flex min-h-[7rem] items-center justify-center border-b border-border px-4 py-4">
+      <div className="flex min-h-[8.5rem] items-center justify-center border-b border-border px-3 py-3">
         <img
           src="/logo.png"
           alt="Lourenço & Najm - Sociedade de Advogados"
-          className="h-16 w-full max-w-[200px] object-contain object-center"
+          className="h-24 w-full max-w-[240px] object-contain object-center"
         />
       </div>
       <nav className="space-y-0.5 p-4">
