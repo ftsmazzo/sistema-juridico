@@ -59,3 +59,39 @@ export const api = {
 export function healthCheck() {
   return api.get<{ ok: boolean; service: string }>("/health");
 }
+
+export type DashboardTotais = {
+  publicacoes: number;
+  prazos: number;
+  prazosPendentes: number;
+  processos: number;
+};
+
+export type ProximoPrazo = {
+  id: number;
+  prazo: string;
+  data: string;
+  tipo: string;
+  numeroProcesso: string | null;
+  status: number;
+};
+
+export type SugestaoIa = {
+  id: number;
+  publicacaoOabId: number;
+  numeroProcesso: string | null;
+  resumo: string | null;
+  observacoesIa: string;
+  createdAt: string;
+};
+
+export type DashboardResponse = {
+  totais: DashboardTotais;
+  proximosPrazos: ProximoPrazo[];
+  sugestoesIa: SugestaoIa[];
+};
+
+/** Dados do dashboard (totais, próximos prazos, sugestões da IA) */
+export function getDashboard() {
+  return api.get<DashboardResponse>("/api/dashboard");
+}

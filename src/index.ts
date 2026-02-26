@@ -2,6 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { handlePublicacoesOab } from "./routes/webhooks/publicacoes-oab.js";
+import { getDashboard } from "./routes/dashboard.js";
 import { runMigrations } from "./db/run-migrate.js";
 
 const app = express();
@@ -14,6 +15,7 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "agenda-prazos-api" });
 });
 
+app.get("/api/dashboard", getDashboard);
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
 async function start() {
