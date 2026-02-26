@@ -1,0 +1,12 @@
+---
+description: Fazer commit e push após alterações, sem pedir confirmação
+alwaysApply: true
+---
+
+# Commit e push após alterações
+
+- Sempre que fizer alterações no código (API, frontend, docs, config), **faça commit e push** para o repositório (branch main) **sem pedir confirmação** ao usuário.
+- Não pergunte "quer que eu faça commit?" — assuma que sim e execute.
+- Exceção: se o usuário disser explicitamente que vai **implantar** e não houver alterações pendentes (nada a commitar), não é necessário fazer nada.
+- Repositório: raiz do projeto (API em src/, frontend em web/). Comandos: `git add` dos arquivos alterados, `git commit` com mensagem clara, `git push origin main`.
+- Use PowerShell no Windows: separar comandos com `;` em vez de `&&`.
