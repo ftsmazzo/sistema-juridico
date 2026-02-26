@@ -106,6 +106,23 @@ export type PrazoListItem = {
   observacao: string | null;
 };
 
+/** Lista publicações OAB (mais recentes primeiro). limit opcional (default 50, máx 200). */
+export type PublicacaoListItem = {
+  id: number;
+  subject: string | null;
+  dataPublicacao: string | null;
+  tipoPublicacao: string | null;
+  numeroProcesso: string | null;
+  vara: string | null;
+  resumo: string | null;
+  createdAt: string;
+};
+
+export function getPublicacoes(limit?: number) {
+  const q = limit != null ? `?limit=${limit}` : "";
+  return api.get<PublicacaoListItem[]>(`/api/publicacoes${q}`);
+}
+
 /** Lista prazos com filtros: inicio, fim (YYYY-MM-DD), status (0=pendente), tipo */
 export function getPrazos(params: {
   inicio?: string;

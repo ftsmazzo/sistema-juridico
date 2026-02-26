@@ -1,10 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { CalendarIcon } from "@/components/icons/CalendarIcon";
 import { DashboardIcon } from "@/components/icons/DashboardIcon";
+import { DocumentIcon } from "@/components/icons/DocumentIcon";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
   { to: "/prazos", label: "Prazos", Icon: CalendarIcon },
+  { to: "/publicacoes", label: "Publicações", Icon: DocumentIcon },
 ];
 
 export function Sidebar() {
