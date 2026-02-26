@@ -16,7 +16,7 @@ export function Sidebar() {
         <img
           src="/logo.png"
           alt="Lourenço & Najm - Sociedade de Advogados"
-          className="h-16 w-full max-w-[200px] object-contain object-center invert"
+          className="h-16 w-full max-w-[200px] object-contain object-center"
         />
       </div>
       <nav className="space-y-0.5 p-4">

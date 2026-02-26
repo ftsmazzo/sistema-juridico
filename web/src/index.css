@@ -4,12 +4,12 @@
 
 @layer base {
   :root {
-    /* Padrão colorimétrico escritório: #333333, #DBB274, #E6E6E6 */
+    /* Padrão colorimétrico: verde, #DBB274 (ouro), #E6E6E6 */
     --background: 0 0% 90%;
     --foreground: 0 0% 13%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 13%;
-    --primary: 0 0% 20%;
+    --primary: 152 25% 18%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 94%;
     --secondary-foreground: 0 0% 13%;
@@ -27,7 +27,7 @@
     --foreground: 0 0% 98%;
     --card: 0 0% 17%;
     --card-foreground: 0 0% 98%;
-    --primary: 0 0% 25%;
+    --primary: 152 25% 28%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 98%;

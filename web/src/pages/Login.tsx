@@ -8,7 +8,7 @@ export function Login() {
           <img
             src="/logo.png"
             alt="Lourenço & Najm"
-            className="h-20 w-full max-w-[260px] object-contain invert"
+            className="h-20 w-full max-w-[260px] object-contain"
           />
           <p className="mt-4 text-base text-muted-foreground">
             Entre com seu usuário para acessar o sistema.
