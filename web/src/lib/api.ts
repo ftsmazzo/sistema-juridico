@@ -50,6 +50,13 @@ export const api = {
     });
   },
 
+  patch<T>(path: string, body?: unknown) {
+    return this.request<T>(path, {
+      method: "PATCH",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  },
+
   delete<T>(path: string) {
     return this.request<T>(path, { method: "DELETE" });
   },
@@ -121,6 +128,53 @@ export type PublicacaoListItem = {
 export function getPublicacoes(limit?: number) {
   const q = limit != null ? `?limit=${limit}` : "";
   return api.get<PublicacaoListItem[]>(`/api/publicacoes${q}`);
+}
+
+export type PublicacaoDetalhe = {
+  id: number;
+  emailId: string;
+  subject: string | null;
+  dateEmail: string | null;
+  fromEmail: string | null;
+  toEmail: string | null;
+  advogadoPrincipal: string | null;
+  numeroOab: string | null;
+  dataProcessamento: string | null;
+  totalPublicacoes: number | null;
+  publicacaoNumero: number;
+  dataDisponibilizacao: string | null;
+  dataPublicacao: string | null;
+  jornal: string | null;
+  pagina: string | null;
+  caderno: string | null;
+  local: string | null;
+  vara: string | null;
+  tipoPublicacao: string | null;
+  numeroProcesso: string | null;
+  valorMencionado: string | null;
+  textoCompleto: string | null;
+  advogados: { nome: string; oab: string }[] | null;
+  poloAtivo: string | null;
+  polosPassivos: string[] | null;
+  urlDocumento: string | null;
+  identificadorDocumento: string | null;
+  resumo: string | null;
+  baseLegal: string | null;
+  prazoDiasUteisSugerido: number | null;
+  observacoesIa: string | null;
+  movimentacoes: { tipo: string; resumo: string }[] | null;
+  createdAt: string;
+};
+
+export function getPublicacao(id: number) {
+  return api.get<PublicacaoDetalhe>(`/api/publicacoes/${id}`);
+}
+
+export function updatePublicacao(
+  id: number,
+  body: Partial<PublicacaoDetalhe>
+) {
+  return api.patch<PublicacaoDetalhe>(`/api/publicacoes/${id}`, body);
 }
 
 /** Lista prazos com filtros: inicio, fim (YYYY-MM-DD), status (0=pendente), tipo */

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { publicacoesOab } from "../db/schema.js";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 export type PublicacaoListItem = {
   id: number;
@@ -56,5 +56,207 @@ export async function listPublicacoes(
   } catch (err) {
     console.error("List publicacoes error:", err);
     res.status(500).json({ error: "Erro ao listar publicações" });
+  }
+}
+
+export type PublicacaoDetalhe = {
+  id: number;
+  emailId: string;
+  subject: string | null;
+  dateEmail: string | null;
+  fromEmail: string | null;
+  toEmail: string | null;
+  advogadoPrincipal: string | null;
+  numeroOab: string | null;
+  dataProcessamento: string | null;
+  totalPublicacoes: number | null;
+  publicacaoNumero: number;
+  dataDisponibilizacao: string | null;
+  dataPublicacao: string | null;
+  jornal: string | null;
+  pagina: string | null;
+  caderno: string | null;
+  local: string | null;
+  vara: string | null;
+  tipoPublicacao: string | null;
+  numeroProcesso: string | null;
+  valorMencionado: string | null;
+  textoCompleto: string | null;
+  advogados: { nome: string; oab: string }[] | null;
+  poloAtivo: string | null;
+  polosPassivos: string[] | null;
+  urlDocumento: string | null;
+  identificadorDocumento: string | null;
+  resumo: string | null;
+  baseLegal: string | null;
+  prazoDiasUteisSugerido: number | null;
+  observacoesIa: string | null;
+  movimentacoes: { tipo: string; resumo: string }[] | null;
+  createdAt: string;
+};
+
+/**
+ * GET /api/publicacoes/:id
+ * Retorna uma publicação por id.
+ */
+export async function getPublicacaoById(
+  req: Request,
+  res: Response<PublicacaoDetalhe | { error: string }>
+): Promise<void> {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+
+    const [row] = await db
+      .select()
+      .from(publicacoesOab)
+      .where(eq(publicacoesOab.id, id))
+      .limit(1);
+
+    if (!row) {
+      res.status(404).json({ error: "Publicação não encontrada" });
+      return;
+    }
+
+    res.json({
+      id: row.id,
+      emailId: row.emailId,
+      subject: row.subject,
+      dateEmail: row.dateEmail ? row.dateEmail.toISOString() : null,
+      fromEmail: row.fromEmail,
+      toEmail: row.toEmail,
+      advogadoPrincipal: row.advogadoPrincipal,
+      numeroOab: row.numeroOab,
+      dataProcessamento: row.dataProcessamento,
+      totalPublicacoes: row.totalPublicacoes,
+      publicacaoNumero: row.publicacaoNumero,
+      dataDisponibilizacao: row.dataDisponibilizacao,
+      dataPublicacao: row.dataPublicacao,
+      jornal: row.jornal,
+      pagina: row.pagina,
+      caderno: row.caderno,
+      local: row.local,
+      vara: row.vara,
+      tipoPublicacao: row.tipoPublicacao,
+      numeroProcesso: row.numeroProcesso,
+      valorMencionado: row.valorMencionado,
+      textoCompleto: row.textoCompleto,
+      advogados: row.advogados ?? null,
+      poloAtivo: row.poloAtivo,
+      polosPassivos: row.polosPassivos ?? null,
+      urlDocumento: row.urlDocumento,
+      identificadorDocumento: row.identificadorDocumento,
+      resumo: row.resumo,
+      baseLegal: row.baseLegal,
+      prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
+      observacoesIa: row.observacoesIa,
+      movimentacoes: row.movimentacoes ?? null,
+      createdAt: row.createdAt.toISOString(),
+    });
+  } catch (err) {
+    console.error("Get publicacao error:", err);
+    res.status(500).json({ error: "Erro ao carregar publicação" });
+  }
+}
+
+/** Campos permitidos para edição (PATCH) */
+const EDITABLE_FIELDS = [
+  "subject", "dataPublicacao", "dataDisponibilizacao", "tipoPublicacao",
+  "numeroProcesso", "vara", "jornal", "pagina", "caderno", "local",
+  "valorMencionado", "textoCompleto", "resumo", "baseLegal",
+  "prazoDiasUteisSugerido", "observacoesIa", "urlDocumento", "identificadorDocumento",
+  "advogadoPrincipal", "numeroOab", "poloAtivo", "advogados", "polosPassivos", "movimentacoes",
+] as const;
+
+/**
+ * PATCH /api/publicacoes/:id
+ * Body: objeto com campos a atualizar (apenas os editáveis).
+ */
+export async function updatePublicacao(
+  req: Request,
+  res: Response<PublicacaoDetalhe | { error: string }>
+): Promise<void> {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+
+    const body = req.body as Record<string, unknown>;
+    const update: Record<string, unknown> = {};
+    for (const key of EDITABLE_FIELDS) {
+      if (key in body) {
+        const v = body[key];
+        if (v === null || typeof v === "string" || typeof v === "number" || Array.isArray(v)) {
+          update[key] = v;
+        } else if (typeof v === "object" && v !== null) {
+          update[key] = v;
+        }
+      }
+    }
+
+    if (Object.keys(update).length === 0) {
+      const [row] = await db.select().from(publicacoesOab).where(eq(publicacoesOab.id, id)).limit(1);
+      if (!row) {
+        res.status(404).json({ error: "Publicação não encontrada" });
+        return;
+      }
+      return getPublicacaoById(req, res);
+    }
+
+    const [updated] = await db
+      .update(publicacoesOab)
+      .set(update as Record<string, unknown>)
+      .where(eq(publicacoesOab.id, id))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "Publicação não encontrada" });
+      return;
+    }
+
+    const row = updated;
+    res.json({
+      id: row.id,
+      emailId: row.emailId,
+      subject: row.subject,
+      dateEmail: row.dateEmail ? row.dateEmail.toISOString() : null,
+      fromEmail: row.fromEmail,
+      toEmail: row.toEmail,
+      advogadoPrincipal: row.advogadoPrincipal,
+      numeroOab: row.numeroOab,
+      dataProcessamento: row.dataProcessamento,
+      totalPublicacoes: row.totalPublicacoes,
+      publicacaoNumero: row.publicacaoNumero,
+      dataDisponibilizacao: row.dataDisponibilizacao,
+      dataPublicacao: row.dataPublicacao,
+      jornal: row.jornal,
+      pagina: row.pagina,
+      caderno: row.caderno,
+      local: row.local,
+      vara: row.vara,
+      tipoPublicacao: row.tipoPublicacao,
+      numeroProcesso: row.numeroProcesso,
+      valorMencionado: row.valorMencionado,
+      textoCompleto: row.textoCompleto,
+      advogados: row.advogados ?? null,
+      poloAtivo: row.poloAtivo,
+      polosPassivos: row.polosPassivos ?? null,
+      urlDocumento: row.urlDocumento,
+      identificadorDocumento: row.identificadorDocumento,
+      resumo: row.resumo,
+      baseLegal: row.baseLegal,
+      prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
+      observacoesIa: row.observacoesIa,
+      movimentacoes: row.movimentacoes ?? null,
+      createdAt: row.createdAt.toISOString(),
+    });
+  } catch (err) {
+    console.error("Update publicacao error:", err);
+    res.status(500).json({ error: "Erro ao atualizar publicação" });
   }
 }

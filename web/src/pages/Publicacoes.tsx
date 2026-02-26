@@ -88,9 +88,12 @@ export function Publicacoes() {
                     className="border-b border-border/60 transition-colors hover:bg-muted/20"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">
+                      <Link
+                        to={`/publicacoes/${p.id}`}
+                        className="block font-medium text-foreground hover:text-primary hover:underline"
+                      >
                         {p.numeroProcesso || "—"}
-                      </div>
+                      </Link>
                       <div className="text-xs text-muted-foreground">
                         {p.tipoPublicacao || "—"}
                       </div>

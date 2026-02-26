@@ -3,6 +3,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Dashboard } from "@/pages/Dashboard";
 import { Prazos } from "@/pages/Prazos";
 import { Publicacoes } from "@/pages/Publicacoes";
+import { DetalhePublicacao } from "@/pages/DetalhePublicacao";
 import { NovaPublicacao } from "@/pages/NovaPublicacao";
 import { Login } from "@/pages/Login";
 
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="prazos" element={<Prazos />} />
           <Route path="publicacoes" element={<Publicacoes />} />
           <Route path="publicacoes/nova" element={<NovaPublicacao />} />
+          <Route path="publicacoes/:id" element={<DetalhePublicacao />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
