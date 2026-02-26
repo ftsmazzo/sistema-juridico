@@ -8,9 +8,9 @@ export function Login() {
           <img
             src="/logo.png"
             alt="Lourenço & Najm"
-            className="max-h-16 w-full max-w-[220px] object-contain"
+            className="h-20 w-full max-w-[260px] object-contain invert"
           />
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-4 text-base text-muted-foreground">
             Entre com seu usuário para acessar o sistema.
           </p>
         </div>
