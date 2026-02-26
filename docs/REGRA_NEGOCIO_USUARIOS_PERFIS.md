@@ -180,6 +180,16 @@ Após rodar a migração `0003_pessoas_e_perfil.sql`, executar o script para pre
 DATABASE_URL=postgresql://... npx tsx src/scripts/migrar-usuarios-para-pessoas.ts
 ```
 
+## 8.1. Seed dos gestores iniciais (opcional)
+
+Para criar os 2 usuários gestores iniciais (Feres Junqueira Najm e Frederico Mazzo):
+
+```bash
+npm run db:seed-gestores
+```
+
+Requer `DATABASE_URL` no ambiente. O script é idempotente (não duplica se o login já existir).
+
 ## 9. Próximos passos (concluídos na implementação)
 
 - Schema e migração 0003.
