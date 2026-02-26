@@ -1,0 +1,61 @@
+/**
+ * Cliente HTTP para a API Agenda Prazos.
+ * Base URL: VITE_API_URL em dev, ou mesmo host em produção (proxy /api).
+ */
+
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  return "";
+};
+
+export const api = {
+  baseUrl: getBaseUrl(),
+
+  async request<T>(
+    path: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    const contentType = res.headers.get("content-type");
+    if (contentType?.includes("application/json")) return res.json() as Promise<T>;
+    return undefined as T;
+  },
+
+  get<T>(path: string) {
+    return this.request<T>(path, { method: "GET" });
+  },
+
+  post<T>(path: string, body?: unknown) {
+    return this.request<T>(path, {
+      method: "POST",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  },
+
+  put<T>(path: string, body?: unknown) {
+    return this.request<T>(path, {
+      method: "PUT",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  },
+
+  delete<T>(path: string) {
+    return this.request<T>(path, { method: "DELETE" });
+  },
+};
+
+/** Health check da API */
+export function healthCheck() {
+  return api.get<{ ok: boolean; service: string }>("/health");
+}

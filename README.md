@@ -4,8 +4,9 @@ Sistema de agenda e controle de prazos para escritório de advocacia. Substitui�
 
 ## Stack
 
-- **Node.js** + **TypeScript** + **Express**
+- **Node.js** + **TypeScript** + **Express** (API em `src/`)
 - **PostgreSQL** + **Drizzle ORM**
+- **Frontend** em `web/`: Vite + React + TypeScript + Tailwind + TanStack Query
 - Webhook para **Publicações OAB** (Recorte Digital) → criação automática de prazos
 
 ## Pré-requisitos
@@ -38,6 +39,14 @@ pnpm dev
 ```
 
 A API sobe em `http://localhost:3000`.
+
+## Frontend (web)
+
+```bash
+cd web && npm install && npm run dev
+```
+
+Interface em `http://localhost:5173`. Veja `web/README.md` e configure `VITE_API_URL` para apontar à API.
 
 ## Webhook: Publicações OAB
 
