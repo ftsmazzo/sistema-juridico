@@ -4,21 +4,21 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
+    /* Padrão colorimétrico escritório: #333333, #DBB274, #E6E6E6 */
+    --background: 0 0% 90%;
     --foreground: 0 0% 13%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 13%;
-    /* Verde padrão escritório #333333 */
     --primary: 0 0% 20%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96%;
+    --secondary: 0 0% 94%;
     --secondary-foreground: 0 0% 13%;
-    --muted: 0 0% 96%;
+    --muted: 0 0% 90%;
     --muted-foreground: 0 0% 45%;
-    --accent: 43 30% 55%;
+    --accent: 36 59% 66%;
     --accent-foreground: 0 0% 13%;
     --destructive: 0 84% 60%;
-    --border: 0 0% 90%;
+    --border: 0 0% 87%;
     --radius: 0.5rem;
   }
 
@@ -33,7 +33,7 @@
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 20%;
     --muted-foreground: 0 0% 65%;
-    --accent: 43 30% 55%;
+    --accent: 36 59% 66%;
     --accent-foreground: 0 0% 13%;
     --destructive: 0 62% 50%;
     --border: 0 0% 20%;
