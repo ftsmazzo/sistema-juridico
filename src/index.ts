@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import { handlePublicacoesOab } from "./routes/webhooks/publicacoes-oab.js";
 import { getDashboard } from "./routes/dashboard.js";
+import { listPrazos } from "./routes/prazos.js";
 import { runMigrations } from "./db/run-migrate.js";
 
 const app = express();
@@ -16,6 +17,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/api/dashboard", getDashboard);
+app.get("/api/prazos", listPrazos);
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
 async function start() {

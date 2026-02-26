@@ -95,3 +95,29 @@ export type DashboardResponse = {
 export function getDashboard() {
   return api.get<DashboardResponse>("/api/dashboard");
 }
+
+export type PrazoListItem = {
+  id: number;
+  prazo: string;
+  data: string;
+  tipo: string;
+  status: number;
+  numeroProcesso: string | null;
+  observacao: string | null;
+};
+
+/** Lista prazos com filtros: inicio, fim (YYYY-MM-DD), status (0=pendente), tipo */
+export function getPrazos(params: {
+  inicio?: string;
+  fim?: string;
+  status?: number | "";
+  tipo?: string;
+}) {
+  const sp = new URLSearchParams();
+  if (params.inicio) sp.set("inicio", params.inicio);
+  if (params.fim) sp.set("fim", params.fim);
+  if (params.status !== undefined && params.status !== "") sp.set("status", String(params.status));
+  if (params.tipo) sp.set("tipo", params.tipo);
+  const q = sp.toString();
+  return api.get<PrazoListItem[]>(`/api/prazos${q ? `?${q}` : ""}`);
+}
