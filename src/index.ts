@@ -13,6 +13,7 @@ import { login } from "./routes/auth.js";
 import { listPessoas, createPessoa, updatePessoa } from "./routes/pessoas.js";
 import { listUsuarios, createUsuario, updateUsuario } from "./routes/usuarios.js";
 import { runMigrations } from "./db/run-migrate.js";
+import { runSeedGestores } from "./db/seed-gestores.js";
 import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
@@ -45,6 +46,11 @@ app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
 async function start() {
   await runMigrations();
+  try {
+    await runSeedGestores();
+  } catch (err) {
+    console.warn("Seed gestores:", err);
+  }
   app.listen(PORT, () => {
     console.log(`API rodando em http://localhost:${PORT}`);
   });
