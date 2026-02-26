@@ -1,8 +1,10 @@
 import { NavLink } from "react-router-dom";
+import { CalendarIcon } from "@/components/icons/CalendarIcon";
+import { DashboardIcon } from "@/components/icons/DashboardIcon";
 
 const nav = [
-  { to: "/dashboard", label: "Dashboard", icon: "◉" },
-  { to: "/prazos", label: "Prazos", icon: "▣" },
+  { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
+  { to: "/prazos", label: "Prazos", Icon: CalendarIcon },
 ];
 
 export function Sidebar() {
@@ -14,7 +16,7 @@ export function Sidebar() {
         </span>
       </div>
       <nav className="space-y-0.5 p-4">
-        {nav.map(({ to, label, icon }) => (
+        {nav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -26,7 +28,7 @@ export function Sidebar() {
               }`
             }
           >
-            <span className="text-base opacity-80" aria-hidden>{icon}</span>
+            <Icon size={20} className="shrink-0 opacity-90" />
             {label}
           </NavLink>
         ))}

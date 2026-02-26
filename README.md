@@ -71,3 +71,4 @@ Cadastre em **usuários** o campo **Número OAB** (ex.: `270074/SP`) para que o 
 - `INTEGRACAO_PUBLICACOES_OAB.md` — contrato do webhook e formato JSON
 - `COMO_OS_USUARIOS_USAM_O_SISTEMA.md` — uso do sistema atual
 - `FONTES_DADOS_JURIDICOS_AUTOMATIZACAO_PRAZOS.md` — fontes de dados (Datajud, Jusbrasil)
+- `docs/ESTRUTURA_USUARIOS.md` — perfis Administrativo, Gestor e Advogados (grupos e permissões)
