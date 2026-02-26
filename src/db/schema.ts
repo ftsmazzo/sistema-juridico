@@ -12,9 +12,25 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-// --- Usuários (advogados e admin) ---
+// --- Pessoas (cadastro único: advogados e não advogados; futuro: clientes) ---
+export const pessoas = pgTable("pessoas", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  sobrenome: varchar("sobrenome", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  celular: varchar("celular", { length: 50 }),
+  tipo: varchar("tipo", { length: 20 }).notNull().default("colaborador"), // advogado | colaborador | cliente
+  numeroOab: varchar("numero_oab", { length: 50 }),
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// --- Usuários (acesso ao sistema: login + perfil; vinculado a uma Pessoa) ---
+// Colunas nome, sobrenome, email, celular, numeroOab, grupo: legado até migração para pessoas
 export const usuarios = pgTable("usuarios", {
   id: serial("id").primaryKey(),
+  idPessoa: integer("id_pessoa").references(() => pessoas.id, { onDelete: "set null" }),
   nome: varchar("nome", { length: 255 }).notNull(),
   sobrenome: varchar("sobrenome", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }),
@@ -24,6 +40,7 @@ export const usuarios = pgTable("usuarios", {
   ativo: boolean("ativo").notNull().default(true),
   relatorio: varchar("relatorio", { length: 255 }).notNull().default("0"),
   grupo: varchar("grupo", { length: 255 }).notNull().default("usuario"),
+  perfil: varchar("perfil", { length: 30 }), // consultivo | administrativo | advogado | gestor (sobrepõe grupo quando preenchido)
   numeroOab: varchar("numero_oab", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -188,6 +205,19 @@ export const analiseIaPublicacao = pgTable("analise_ia_publicacao", {
 });
 
 // Relações
+export const pessoasRelations = relations(pessoas, ({ many }) => ({
+  usuarios: many(usuarios),
+}));
+
+export const usuariosRelations = relations(usuarios, ({ one, many }) => ({
+  pessoa: one(pessoas, {
+    fields: [usuarios.idPessoa],
+    references: [pessoas.id],
+  }),
+  prazosUsuarios: many(prazosUsuarios),
+  audienciasUsuarios: many(audienciasUsuarios),
+}));
+
 export const prazosRelations = relations(prazos, ({ one, many }) => ({
   publicacaoOab: one(publicacoesOab, {
     fields: [prazos.publicacaoOabId],
