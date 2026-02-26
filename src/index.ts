@@ -9,6 +9,7 @@ import {
   getPublicacaoById,
   updatePublicacao,
 } from "./routes/publicacoes.js";
+import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
 import { login } from "./routes/auth.js";
 import { listPessoas, createPessoa, updatePessoa } from "./routes/pessoas.js";
 import { listUsuarios, createUsuario, updateUsuario } from "./routes/usuarios.js";
@@ -20,7 +21,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "agenda-prazos-api" });
@@ -33,6 +34,7 @@ app.get("/api/prazos", listPrazos);
 app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);
+app.post("/api/publicacoes/por-print", requireAuth, publicacaoPorPrint);
 
 app.get("/api/pessoas", requireAuth, listPessoas);
 app.post("/api/pessoas", requireAuth, createPessoa);

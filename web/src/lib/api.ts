@@ -182,6 +182,19 @@ export function updatePublicacao(
   return api.patch<PublicacaoDetalhe>(`/api/publicacoes/${id}`, body);
 }
 
+/** Cadastra publicação a partir de imagem (print). Extração por IA no backend. */
+export type PublicacaoPorPrintResponse = {
+  publicacaoId: number;
+  prazoIds: number[];
+  message: string;
+};
+
+export function cadastrarPublicacaoPorPrint(imageBase64: string) {
+  return api.post<PublicacaoPorPrintResponse>("/api/publicacoes/por-print", {
+    image: imageBase64,
+  });
+}
+
 /** Lista prazos com filtros: inicio, fim (YYYY-MM-DD), status (0=pendente), tipo */
 export function getPrazos(params: {
   inicio?: string;
