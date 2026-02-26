@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getDashboard } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 
 function formatarData(iso: string) {
   const d = new Date(iso + "T12:00:00");
@@ -39,6 +40,11 @@ export function Dashboard() {
   const proximosPrazos = data?.proximosPrazos ?? [];
   const sugestoesIa = data?.sugestoesIa ?? [];
 
+  const user = getUser();
+  const nomeUsuario = user?.pessoa
+    ? `${user.pessoa.nome} ${user.pessoa.sobrenome}`
+    : user?.login ?? "";
+
   return (
     <div className="space-y-10">
       <div>
@@ -46,7 +52,14 @@ export function Dashboard() {
           Visão geral
         </h2>
         <p className="mt-1 text-muted-foreground">
-          Publicações OAB, prazos e observações da análise por IA.
+          {nomeUsuario ? (
+            <>
+              Olá, <span className="font-medium text-foreground">{nomeUsuario}</span>.
+              Aqui está sua visão de publicações OAB, prazos e observações da análise por IA.
+            </>
+          ) : (
+            "Publicações OAB, prazos e observações da análise por IA."
+          )}
         </p>
       </div>
 
