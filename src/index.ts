@@ -1,4 +1,5 @@
 import "dotenv/config";
+import cors from "cors";
 import express from "express";
 import { handlePublicacoesOab } from "./routes/webhooks/publicacoes-oab.js";
 import { runMigrations } from "./db/run-migrate.js";
@@ -6,6 +7,7 @@ import { runMigrations } from "./db/run-migrate.js";
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/health", (_req, res) => {
