@@ -11,8 +11,8 @@ const nav = [
 
 export function Sidebar() {
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-primary/30 bg-primary lg:block">
-      <div className="flex min-h-[11rem] flex-col items-center justify-center border-b border-primary-foreground/20 px-3 py-4">
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-white/10 bg-[var(--sidebar-bg)] lg:block">
+      <div className="flex min-h-[11rem] flex-col items-center justify-center border-b border-white/10 px-3 py-4">
         <img
           src="/logo.png"
           alt="Lourenço & Najm - Sociedade de Advogados"
@@ -27,8 +27,8 @@ export function Sidebar() {
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  ? "bg-white/10 text-white"
+                  : "text-white/85 hover:bg-white/5 hover:text-white"
               }`
             }
           >

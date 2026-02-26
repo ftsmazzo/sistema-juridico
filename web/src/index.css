@@ -20,6 +20,8 @@
     --destructive: 0 84% 60%;
     --border: 0 0% 87%;
     --radius: 0.5rem;
+    /* Verde da sidebar = mesmo tom da logo (fundo da imagem) */
+    --sidebar-bg: #314841;
   }
 
   .dark {
