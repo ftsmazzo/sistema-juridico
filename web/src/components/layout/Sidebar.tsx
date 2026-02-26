@@ -2,14 +2,21 @@ import { NavLink } from "react-router-dom";
 import { CalendarIcon } from "@/components/icons/CalendarIcon";
 import { DashboardIcon } from "@/components/icons/DashboardIcon";
 import { DocumentIcon } from "@/components/icons/DocumentIcon";
+import { UsersIcon } from "@/components/icons/UsersIcon";
+import { podeVerPessoas, podeVerUsuarios } from "@/lib/auth";
 
-const nav = [
+const baseNav = [
   { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
   { to: "/prazos", label: "Prazos", Icon: CalendarIcon },
   { to: "/publicacoes", label: "Publicações", Icon: DocumentIcon },
 ];
 
 export function Sidebar() {
+  const nav = [
+    ...baseNav,
+    ...(podeVerPessoas() ? [{ to: "/pessoas" as const, label: "Pessoas" as const, Icon: UsersIcon }] : []),
+    ...(podeVerUsuarios() ? [{ to: "/usuarios" as const, label: "Usuários" as const, Icon: UsersIcon }] : []),
+  ];
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-white/10 bg-[var(--sidebar-bg)] lg:block">
       <div className="flex min-h-[11rem] flex-col items-center justify-center border-b border-white/10 px-3 py-4">

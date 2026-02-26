@@ -9,7 +9,11 @@ import {
   getPublicacaoById,
   updatePublicacao,
 } from "./routes/publicacoes.js";
+import { login } from "./routes/auth.js";
+import { listPessoas, createPessoa, updatePessoa } from "./routes/pessoas.js";
+import { listUsuarios, createUsuario, updateUsuario } from "./routes/usuarios.js";
 import { runMigrations } from "./db/run-migrate.js";
+import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -21,11 +25,22 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "agenda-prazos-api" });
 });
 
+app.post("/api/auth/login", login);
+
 app.get("/api/dashboard", getDashboard);
 app.get("/api/prazos", listPrazos);
 app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);
+
+app.get("/api/pessoas", requireAuth, listPessoas);
+app.post("/api/pessoas", requireAuth, createPessoa);
+app.patch("/api/pessoas/:id", requireAuth, updatePessoa);
+
+app.get("/api/usuarios", requireAuth, listUsuarios);
+app.post("/api/usuarios", requireAuth, createUsuario);
+app.patch("/api/usuarios/:id", requireAuth, updateUsuario);
+
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
 async function start() {

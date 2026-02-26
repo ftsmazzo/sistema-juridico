@@ -3,6 +3,8 @@
  * Base URL: VITE_API_URL em dev, ou mesmo host em produção (proxy /api).
  */
 
+import { getToken } from "./auth";
+
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   return "";
@@ -16,12 +18,15 @@ export const api = {
     options: RequestInit = {}
   ): Promise<T> {
     const url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
+    const token = getToken();
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(url, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+      headers,
     });
     if (!res.ok) {
       const text = await res.text();
@@ -191,4 +196,83 @@ export function getPrazos(params: {
   if (params.tipo) sp.set("tipo", params.tipo);
   const q = sp.toString();
   return api.get<PrazoListItem[]>(`/api/prazos${q ? `?${q}` : ""}`);
+}
+
+// --- Auth ---
+export type LoginResponse = {
+  token: string;
+  user: import("./auth").User;
+};
+
+export function login(login: string, senha: string) {
+  return api.post<LoginResponse>("/api/auth/login", { login, senha });
+}
+
+// --- Pessoas ---
+export type PessoaListItem = {
+  id: number;
+  nome: string;
+  sobrenome: string;
+  email: string | null;
+  celular: string | null;
+  tipo: string;
+  numeroOab: string | null;
+  ativo: boolean;
+};
+
+export function getPessoas(params?: { q?: string; ativo?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.q) sp.set("q", params.q);
+  if (params?.ativo) sp.set("ativo", params.ativo);
+  const q = sp.toString();
+  return api.get<PessoaListItem[]>(`/api/pessoas${q ? `?${q}` : ""}`);
+}
+
+export function createPessoa(body: {
+  nome: string;
+  sobrenome: string;
+  email?: string;
+  celular?: string;
+  tipo?: string;
+  numeroOab?: string;
+}) {
+  return api.post<PessoaListItem>("/api/pessoas", body);
+}
+
+export function updatePessoa(
+  id: number,
+  body: Partial<Omit<PessoaListItem, "id">>
+) {
+  return api.patch<PessoaListItem>(`/api/pessoas/${id}`, body);
+}
+
+// --- Usuários ---
+export type UsuarioListItem = {
+  id: number;
+  login: string;
+  perfil: string;
+  ativo: boolean;
+  idPessoa: number | null;
+  pessoa: { id: number; nome: string; sobrenome: string } | null;
+};
+
+export function getUsuarios(params?: { q?: string }) {
+  const q = params?.q ? `?q=${encodeURIComponent(params.q)}` : "";
+  return api.get<UsuarioListItem[]>(`/api/usuarios${q}`);
+}
+
+export function createUsuario(body: {
+  idPessoa?: number;
+  login: string;
+  senha: string;
+  perfil?: string;
+}) {
+  return api.post<UsuarioListItem>("/api/usuarios", body);
+}
+
+export function updateUsuario(
+  id: number,
+  body: { idPessoa?: number | null; perfil?: string; ativo?: boolean; senha?: string }
+) {
+  return api.patch<UsuarioListItem>(`/api/usuarios/${id}`, body);
 }

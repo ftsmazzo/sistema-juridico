@@ -168,9 +168,21 @@ Recomendação: **Opção A** — pessoa com tipo `cliente` e tabela `clientes` 
 
 ---
 
-## 7. Próximos passos imediatos
+## 7. Variável de ambiente (API)
 
-1. Confirmar esta matriz de perfis e permissões com o escritório.
-2. Implementar no schema (Drizzle): `pessoas`, coluna `perfil` em `usuarios`, `id_pessoa` em `usuarios`.
-3. Atualizar `roles.ts` (ou equivalente) com os 4 perfis e funções `podeVerTodosPrazos`, `podeGerenciarUsuarios`, `podeApenasConsultar`, etc.
-4. Escrever migração SQL/Drizzle e script de migração de dados a partir da tabela `usuarios` atual.
+- **JWT_SECRET**: segredo para assinar o token de autenticação (login). Definir em produção (ex.: `openssl rand -hex 32`).
+
+## 8. Migração de dados (uma vez)
+
+Após rodar a migração `0003_pessoas_e_perfil.sql`, executar o script para preencher `pessoas` e `usuarios.id_pessoa` / `usuarios.perfil`:
+
+```bash
+DATABASE_URL=postgresql://... npx tsx src/scripts/migrar-usuarios-para-pessoas.ts
+```
+
+## 9. Próximos passos (concluídos na implementação)
+
+- Schema e migração 0003.
+- `roles.ts` com 4 perfis e helpers de permissão.
+- API: POST /api/auth/login, GET/POST/PATCH /api/pessoas, GET/POST/PATCH /api/usuarios (com middleware requireAuth e checagem de perfil).
+- Front: login com token, guard de rota, páginas Pessoas e Usuários (Gestor/Administrativo).
