@@ -21,7 +21,8 @@ function getTextFromItem(j) {
   if (typeof j.output === 'string') return j.output;
   if (typeof j.result === 'string') return j.result;
   if (typeof j.reply === 'string') return j.reply;
-  const content = j.content;
+  // Resposta da API Claude (Messages): body.content[].text
+  const content = j.content || j.body?.content;
   if (Array.isArray(content) && content.length > 0) {
     const block = content.find((c) => c && c.type === 'text') || content[0];
     if (block && block.text) return block.text;

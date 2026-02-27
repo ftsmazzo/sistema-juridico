@@ -189,9 +189,31 @@ export type PublicacaoPorPrintResponse = {
   message: string;
 };
 
-export function cadastrarPublicacaoPorPrint(imageBase64: string) {
+export type ProvedorIa = "openai" | "claude";
+
+/** Modelos disponíveis por provedor (para seleção na tela de print). */
+export const MODELOS_IA = {
+  openai: [
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini" },
+    { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+  ],
+  claude: [
+    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+    { value: "claude-opus-4-20250514", label: "Claude Opus 4" },
+    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+  ],
+} as const;
+
+export function cadastrarPublicacaoPorPrint(
+  imageBase64: string,
+  opcoes?: { provider?: ProvedorIa; model?: string }
+) {
   return api.post<PublicacaoPorPrintResponse>("/api/publicacoes/por-print", {
     image: imageBase64,
+    ...(opcoes?.provider && { provider: opcoes.provider }),
+    ...(opcoes?.model && { model: opcoes.model }),
   });
 }
 

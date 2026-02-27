@@ -18,7 +18,11 @@ export async function publicacaoPorPrint(
     return;
   }
 
-  const body = req.body as { image?: string };
+  const body = req.body as {
+    image?: string;
+    provider?: "openai" | "claude";
+    model?: string;
+  };
   const image = body?.image;
   if (!image || typeof image !== "string") {
     res.status(400).json({ error: "Envie a imagem em base64 no campo 'image'." });
@@ -26,7 +30,10 @@ export async function publicacaoPorPrint(
   }
 
   try {
-    const extracted = await extrairPublicacaoDeImagem(image);
+    const extracted = await extrairPublicacaoDeImagem(image, {
+      provider: body.provider,
+      model: body.model,
+    });
     const emailId = `print-${req.user.id}-${Date.now()}`;
     const publicacaoNumero = 1;
 
@@ -70,9 +77,9 @@ export async function publicacaoPorPrint(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro ao processar imagem.";
     console.error("Publicação por print:", err);
-    if (message.includes("OPENAI_API_KEY")) {
+    if (message.includes("OPENAI_API_KEY") || message.includes("ANTHROPIC_API_KEY")) {
       res.status(503).json({
-        error: "Serviço de extração por IA não configurado. Configure OPENAI_API_KEY.",
+        error: "Serviço de extração por IA não configurado. Configure OPENAI_API_KEY ou ANTHROPIC_API_KEY.",
       });
       return;
     }

@@ -1,6 +1,10 @@
 import { useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { cadastrarPublicacaoPorPrint } from "@/lib/api";
+import {
+  cadastrarPublicacaoPorPrint,
+  MODELOS_IA,
+  type ProvedorIa,
+} from "@/lib/api";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -19,6 +23,8 @@ export function NovaPublicacao() {
   const navigate = useNavigate();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [provider, setProvider] = useState<ProvedorIa>("openai");
+  const [model, setModel] = useState<string>(MODELOS_IA.openai[0].value);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,6 +73,11 @@ export function NovaPublicacao() {
     [setImage]
   );
 
+  const handleProviderChange = (p: ProvedorIa) => {
+    setProvider(p);
+    setModel(MODELOS_IA[p][0].value);
+  };
+
   const handleSubmit = async () => {
     if (!imageBase64) {
       setError("Envie uma imagem primeiro (arraste, clique ou cole).");
@@ -75,7 +86,10 @@ export function NovaPublicacao() {
     setError("");
     setLoading(true);
     try {
-      const res = await cadastrarPublicacaoPorPrint(imageBase64);
+      const res = await cadastrarPublicacaoPorPrint(imageBase64, {
+        provider,
+        model,
+      });
       navigate(`/publicacoes/${res.publicacaoId}`, {
         replace: true,
         state: { message: res.message },
@@ -147,7 +161,33 @@ export function NovaPublicacao() {
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm font-medium text-foreground">
+                  IA:
+                </label>
+                <select
+                  value={provider}
+                  onChange={(e) =>
+                    handleProviderChange(e.target.value as ProvedorIa)
+                  }
+                  className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+                >
+                  <option value="openai">OpenAI (GPT)</option>
+                  <option value="claude">Claude (Anthropic)</option>
+                </select>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+                >
+                  {MODELOS_IA[provider].map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 onClick={handleSubmit}
