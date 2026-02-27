@@ -219,7 +219,6 @@ function UsuarioModal({
   error?: string;
 }) {
   const isEdit = usuarioFull != null;
-  const p = usuarioFull?.pessoa;
 
   const [nome, setNome] = useState("");
   const [sobrenome, setSobrenome] = useState("");
