@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getUsuarios,
-  getPessoas,
+  getUsuario,
   createUsuario,
   updateUsuario,
   type UsuarioListItem,
+  type UsuarioComPessoa,
 } from "@/lib/api";
 
 const PERFIS = [
@@ -15,20 +16,27 @@ const PERFIS = [
   { value: "gestor", label: "Gestor" },
 ];
 
+const TIPOS_PESSOA = [
+  { value: "colaborador", label: "Colaborador" },
+  { value: "advogado", label: "Advogado" },
+  { value: "cliente", label: "Cliente" },
+];
+
 export function Usuarios() {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<UsuarioListItem | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const { data: list = [], isPending } = useQuery({
     queryKey: ["usuarios", q],
     queryFn: () => getUsuarios({ q: q || undefined }),
   });
 
-  const { data: pessoasList = [] } = useQuery({
-    queryKey: ["pessoas"],
-    queryFn: () => getPessoas({}),
+  const { data: usuarioFull, isPending: loadingEdit } = useQuery({
+    queryKey: ["usuario", editingId],
+    queryFn: () => getUsuario(editingId!),
+    enabled: modalOpen && editingId != null,
   });
 
   const createMutation = useMutation({
@@ -36,7 +44,7 @@ export function Usuarios() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
       setModalOpen(false);
-      setEditing(null);
+      setEditingId(null);
     },
   });
 
@@ -51,17 +59,17 @@ export function Usuarios() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
       setModalOpen(false);
-      setEditing(null);
+      setEditingId(null);
     },
   });
 
   function openNew() {
-    setEditing(null);
+    setEditingId(null);
     setModalOpen(true);
   }
 
   function openEdit(u: UsuarioListItem) {
-    setEditing(u);
+    setEditingId(u.id);
     setModalOpen(true);
   }
 
@@ -95,7 +103,7 @@ export function Usuarios() {
             <thead className="border-b border-border bg-muted/50">
               <tr>
                 <th className="p-3 font-medium">Login</th>
-                <th className="p-3 font-medium">Pessoa</th>
+                <th className="p-3 font-medium">Nome</th>
                 <th className="p-3 font-medium">Perfil</th>
                 <th className="p-3 font-medium">Ativo</th>
                 <th className="p-3 font-medium w-20">Ações</th>
@@ -135,18 +143,23 @@ export function Usuarios() {
 
       {modalOpen && (
         <UsuarioModal
-          usuario={editing}
-          pessoasList={pessoasList}
+          usuarioFull={editingId != null ? usuarioFull ?? null : null}
+          loadingEdit={loadingEdit && editingId != null}
           onClose={() => {
             setModalOpen(false);
-            setEditing(null);
+            setEditingId(null);
           }}
           onSubmit={(body) => {
-            if (editing) {
+            if (editingId != null) {
               updateMutation.mutate({
-                id: editing.id,
+                id: editingId,
                 body: {
-                  idPessoa: body.idPessoa,
+                  nome: body.nome,
+                  sobrenome: body.sobrenome,
+                  email: body.email,
+                  celular: body.celular,
+                  tipo: body.tipo,
+                  numeroOab: body.numeroOab,
                   perfil: body.perfil,
                   ativo: body.ativo,
                   senha: body.senha,
@@ -154,7 +167,12 @@ export function Usuarios() {
               });
             } else {
               createMutation.mutate({
-                idPessoa: body.idPessoa ?? undefined,
+                nome: body.nome!,
+                sobrenome: body.sobrenome!,
+                email: body.email,
+                celular: body.celular,
+                tipo: body.tipo,
+                numeroOab: body.numeroOab,
                 login: body.login!,
                 senha: body.senha!,
                 perfil: body.perfil,
@@ -172,48 +190,100 @@ export function Usuarios() {
   );
 }
 
+type FormBody = {
+  nome?: string;
+  sobrenome?: string;
+  email?: string;
+  celular?: string;
+  tipo?: string;
+  numeroOab?: string;
+  login?: string;
+  senha?: string;
+  perfil?: string;
+  ativo?: boolean;
+};
+
 function UsuarioModal({
-  usuario,
-  pessoasList,
+  usuarioFull,
+  loadingEdit,
   onClose,
   onSubmit,
   loading,
   error,
 }: {
-  usuario: UsuarioListItem | null;
-  pessoasList: { id: number; nome: string; sobrenome: string }[];
+  usuarioFull: UsuarioComPessoa | null;
+  loadingEdit: boolean;
   onClose: () => void;
-  onSubmit: (body: {
-    idPessoa?: number | null;
-    login?: string;
-    senha?: string;
-    perfil?: string;
-    ativo?: boolean;
-  }) => void;
+  onSubmit: (body: FormBody) => void;
   loading: boolean;
   error?: string;
 }) {
-  const [idPessoa, setIdPessoa] = useState<number | "">(
-    usuario?.idPessoa ?? ""
-  );
-  const [login, setLogin] = useState(usuario?.login ?? "");
+  const isEdit = usuarioFull != null;
+  const p = usuarioFull?.pessoa;
+
+  const [nome, setNome] = useState("");
+  const [sobrenome, setSobrenome] = useState("");
+  const [email, setEmail] = useState("");
+  const [celular, setCelular] = useState("");
+  const [tipo, setTipo] = useState("colaborador");
+  const [numeroOab, setNumeroOab] = useState("");
+  const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
-  const [perfil, setPerfil] = useState(usuario?.perfil ?? "advogado");
-  const [ativo, setAtivo] = useState(usuario?.ativo ?? true);
+  const [perfil, setPerfil] = useState("advogado");
+  const [ativo, setAtivo] = useState(true);
+
+  useEffect(() => {
+    if (!usuarioFull) {
+      if (!isEdit) {
+        setNome("");
+        setSobrenome("");
+        setEmail("");
+        setCelular("");
+        setTipo("colaborador");
+        setNumeroOab("");
+        setLogin("");
+        setSenha("");
+        setPerfil("advogado");
+        setAtivo(true);
+      }
+      return;
+    }
+    const pessoa = usuarioFull.pessoa;
+    setNome(pessoa?.nome ?? "");
+    setSobrenome(pessoa?.sobrenome ?? "");
+    setEmail(pessoa?.email ?? "");
+    setCelular(pessoa?.celular ?? "");
+    setTipo(pessoa?.tipo ?? "colaborador");
+    setNumeroOab(pessoa?.numeroOab ?? "");
+    setLogin(usuarioFull.login);
+    setSenha("");
+    setPerfil(usuarioFull.perfil);
+    setAtivo(usuarioFull.ativo);
+  }, [usuarioFull, isEdit]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (usuario) {
+    if (isEdit) {
       onSubmit({
-        idPessoa: idPessoa === "" ? null : idPessoa,
+        nome: nome.trim(),
+        sobrenome: sobrenome.trim(),
+        email: email.trim() || undefined,
+        celular: celular.trim() || undefined,
+        tipo: tipo || undefined,
+        numeroOab: numeroOab.trim() || undefined,
         perfil,
         ativo,
         senha: senha.trim() || undefined,
       });
     } else {
-      if (!login.trim() || !senha) return;
+      if (!nome.trim() || !sobrenome.trim() || !login.trim() || !senha) return;
       onSubmit({
-        idPessoa: idPessoa === "" ? undefined : (idPessoa as number),
+        nome: nome.trim(),
+        sobrenome: sobrenome.trim(),
+        email: email.trim() || undefined,
+        celular: celular.trim() || undefined,
+        tipo: tipo || undefined,
+        numeroOab: numeroOab.trim() || undefined,
         login: login.trim(),
         senha,
         perfil,
@@ -221,97 +291,177 @@ function UsuarioModal({
     }
   }
 
+  const canSubmit = isEdit
+    ? nome.trim() && sobrenome.trim()
+    : nome.trim() && sobrenome.trim() && login.trim() && senha;
+
+  if (loadingEdit) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="rounded-lg border border-border bg-card px-8 py-6 text-sm text-muted-foreground">
+          Carregando…
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-lg my-8">
         <h2 className="mb-4 text-lg font-semibold">
-          {usuario ? "Editar usuário" : "Novo usuário"}
+          {isEdit ? "Editar usuário" : "Novo usuário"}
         </h2>
         {error && (
           <p className="mb-3 rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
           </p>
         )}
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium">Pessoa</label>
-            <select
-              value={idPessoa}
-              onChange={(e) =>
-                setIdPessoa(e.target.value === "" ? "" : Number(e.target.value))
-              }
-              className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
-              disabled={!!usuario}
-            >
-              <option value="">— Sem vínculo —</option>
-              {pessoasList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome} {p.sobrenome}
-                </option>
-              ))}
-            </select>
-          </div>
-          {!usuario && (
-            <>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset className="space-y-3 rounded border border-border p-3">
+            <legend className="text-sm font-medium text-foreground">
+              Dados da pessoa
+            </legend>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium">Login</label>
+                <label className="block text-sm font-medium">Nome</label>
                 <input
                   type="text"
-                  value={login}
-                  onChange={(e) => setLogin(e.target.value)}
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
                   className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium">Senha</label>
+                <label className="block text-sm font-medium">Sobrenome</label>
+                <input
+                  type="text"
+                  value={sobrenome}
+                  onChange={(e) => setSobrenome(e.target.value)}
+                  className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">E-mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Celular</label>
+              <input
+                type="text"
+                value={celular}
+                onChange={(e) => setCelular(e.target.value)}
+                className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium">Tipo</label>
+                <select
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value)}
+                  className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+                >
+                  {TIPOS_PESSOA.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Nº OAB</label>
+                <input
+                  type="text"
+                  value={numeroOab}
+                  onChange={(e) => setNumeroOab(e.target.value)}
+                  className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded border border-border p-3">
+            <legend className="text-sm font-medium text-foreground">
+              Acesso ao sistema
+            </legend>
+            {!isEdit && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium">Login</label>
+                  <input
+                    type="text"
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
+                    className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+                    required={!isEdit}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Senha</label>
+                  <input
+                    type="password"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
+                    required={!isEdit}
+                  />
+                </div>
+              </>
+            )}
+            {isEdit && (
+              <div>
+                <label className="block text-sm font-medium">Login</label>
+                <p className="mt-1 text-sm text-muted-foreground">{login}</p>
+              </div>
+            )}
+            {isEdit && (
+              <div>
+                <label className="block text-sm font-medium">
+                  Nova senha (deixe em branco para manter)
+                </label>
                 <input
                   type="password"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
-                  required={!usuario}
                 />
               </div>
-            </>
-          )}
-          {usuario && (
+            )}
             <div>
-              <label className="block text-sm font-medium">
-                Nova senha (deixe em branco para manter)
-              </label>
-              <input
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+              <label className="block text-sm font-medium">Perfil</label>
+              <select
+                value={perfil}
+                onChange={(e) => setPerfil(e.target.value)}
                 className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
-              />
+              >
+                {PERFIS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium">Perfil</label>
-            <select
-              value={perfil}
-              onChange={(e) => setPerfil(e.target.value)}
-              className="mt-1 w-full rounded border border-border px-3 py-2 text-sm"
-            >
-              {PERFIS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {usuario && (
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={ativo}
-                onChange={(e) => setAtivo(e.target.checked)}
-              />
-              <span className="text-sm">Ativo</span>
-            </label>
-          )}
+            {isEdit && (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={ativo}
+                  onChange={(e) => setAtivo(e.target.checked)}
+                />
+                <span className="text-sm">Ativo</span>
+              </label>
+            )}
+          </fieldset>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -322,10 +472,10 @@ function UsuarioModal({
             </button>
             <button
               type="submit"
-              disabled={loading || (!usuario && (!login.trim() || !senha))}
+              disabled={loading || !canSubmit}
               className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? "Salvando…" : usuario ? "Salvar" : "Criar"}
+              {loading ? "Salvando…" : isEdit ? "Salvar" : "Criar"}
             </button>
           </div>
         </form>

@@ -269,13 +269,35 @@ export type UsuarioListItem = {
   pessoa: { id: number; nome: string; sobrenome: string } | null;
 };
 
+/** Usuário com dados completos da pessoa (para edição). */
+export type UsuarioComPessoa = UsuarioListItem & {
+  pessoa: {
+    id: number;
+    nome: string;
+    sobrenome: string;
+    email: string | null;
+    celular: string | null;
+    tipo: string;
+    numeroOab: string | null;
+  } | null;
+};
+
 export function getUsuarios(params?: { q?: string }) {
   const q = params?.q ? `?q=${encodeURIComponent(params.q)}` : "";
   return api.get<UsuarioListItem[]>(`/api/usuarios${q}`);
 }
 
+export function getUsuario(id: number) {
+  return api.get<UsuarioComPessoa>(`/api/usuarios/${id}`);
+}
+
 export function createUsuario(body: {
-  idPessoa?: number;
+  nome: string;
+  sobrenome: string;
+  email?: string;
+  celular?: string;
+  tipo?: string;
+  numeroOab?: string;
   login: string;
   senha: string;
   perfil?: string;
@@ -285,7 +307,17 @@ export function createUsuario(body: {
 
 export function updateUsuario(
   id: number,
-  body: { idPessoa?: number | null; perfil?: string; ativo?: boolean; senha?: string }
+  body: {
+    nome?: string;
+    sobrenome?: string;
+    email?: string;
+    celular?: string;
+    tipo?: string;
+    numeroOab?: string;
+    perfil?: string;
+    ativo?: boolean;
+    senha?: string;
+  }
 ) {
   return api.patch<UsuarioListItem>(`/api/usuarios/${id}`, body);
 }

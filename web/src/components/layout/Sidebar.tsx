@@ -4,7 +4,7 @@ import { DashboardIcon } from "@/components/icons/DashboardIcon";
 import { DocumentIcon } from "@/components/icons/DocumentIcon";
 import { UsersIcon } from "@/components/icons/UsersIcon";
 import { SettingsIcon } from "@/components/icons/SettingsIcon";
-import { podeVerPessoas, podeVerUsuarios, isGestor } from "@/lib/auth";
+import { podeVerUsuarios, isGestor } from "@/lib/auth";
 
 const baseNav = [
   { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
@@ -15,7 +15,6 @@ const baseNav = [
 export function Sidebar() {
   const nav = [
     ...baseNav,
-    ...(podeVerPessoas() ? [{ to: "/pessoas" as const, label: "Pessoas" as const, Icon: UsersIcon }] : []),
     ...(podeVerUsuarios() ? [{ to: "/usuarios" as const, label: "Usuários" as const, Icon: UsersIcon }] : []),
     ...(isGestor() ? [{ to: "/administracao" as const, label: "Administração" as const, Icon: SettingsIcon }] : []),
   ];
