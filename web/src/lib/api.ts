@@ -182,9 +182,10 @@ export function updatePublicacao(
   return api.patch<PublicacaoDetalhe>(`/api/publicacoes/${id}`, body);
 }
 
-/** Cadastra publicação a partir de imagem (print). Extração por IA no backend. */
+/** Cadastra publicação(ões) a partir de imagem (print). Extração por IA no backend. */
 export type PublicacaoPorPrintResponse = {
   publicacaoId: number;
+  publicacaoIds: number[];
   prazoIds: number[];
   message: string;
 };

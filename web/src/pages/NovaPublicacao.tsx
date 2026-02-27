@@ -90,10 +90,18 @@ export function NovaPublicacao() {
         provider,
         model,
       });
-      navigate(`/publicacoes/${res.publicacaoId}`, {
-        replace: true,
-        state: { message: res.message },
-      });
+      const ids = res.publicacaoIds ?? (res.publicacaoId != null ? [res.publicacaoId] : []);
+      if (ids.length === 1) {
+        navigate(`/publicacoes/${ids[0]}`, {
+          replace: true,
+          state: { message: res.message },
+        });
+      } else {
+        navigate("/publicacoes", {
+          replace: true,
+          state: { message: res.message },
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao cadastrar publicação.");
     } finally {
@@ -115,9 +123,41 @@ export function NovaPublicacao() {
           Nova publicação por print
         </h2>
         <p className="mt-1 text-muted-foreground">
-          Envie um <strong>print de tela</strong> ou imagem da publicação. A IA extrai os dados,
-          grava a publicação e gera prazos quando for intimação.
+          Escolha a IA e o modelo abaixo, depois envie o print. A extração só roda ao clicar em &quot;Extrair e cadastrar&quot;.
+          Se a imagem tiver várias publicações, todas são cadastradas.
         </p>
+      </div>
+
+      {/* Provedor e modelo sempre visíveis, antes de colar/arrastar */}
+      <div className="rounded-lg border border-border bg-muted/20 p-4">
+        <p className="mb-2 text-sm font-medium text-foreground">
+          Extração por IA (escolha antes de enviar a imagem)
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={provider}
+            onChange={(e) =>
+              handleProviderChange(e.target.value as ProvedorIa)
+            }
+            className="rounded border border-border bg-background px-3 py-2 text-sm"
+            aria-label="Provedor de IA"
+          >
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="claude">Claude (Anthropic)</option>
+          </select>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="rounded border border-border bg-background px-3 py-2 text-sm"
+            aria-label="Modelo"
+          >
+            {MODELOS_IA[provider].map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div
@@ -140,7 +180,7 @@ export function NovaPublicacao() {
               Arraste a imagem aqui, clique para escolher ou cole (Ctrl+V)
             </span>
             <span className="text-sm text-muted-foreground">
-              PNG, JPG ou WebP. Tamanho máximo recomendado: 10 MB.
+              PNG, JPG ou WebP. Uma ou várias publicações na mesma imagem.
             </span>
           </label>
         ) : (
@@ -161,33 +201,7 @@ export function NovaPublicacao() {
                 </button>
               </div>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="text-sm font-medium text-foreground">
-                  IA:
-                </label>
-                <select
-                  value={provider}
-                  onChange={(e) =>
-                    handleProviderChange(e.target.value as ProvedorIa)
-                  }
-                  className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-                >
-                  <option value="openai">OpenAI (GPT)</option>
-                  <option value="claude">Claude (Anthropic)</option>
-                </select>
-                <select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-                >
-                  {MODELOS_IA[provider].map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={handleSubmit}

@@ -13,8 +13,10 @@ Use estas variáveis no painel do EasyPanel em **Variables** (ou **Environment**
 | `NODE_ENV` | Não | `production` | Define ambiente (production/development). |
 | `WEBHOOK_PUBLICACOES_OAB_SECRET` | Não | `um-token-segredo-forte` | Segredo para validar o webhook de Publicações OAB. Se definido, o N8N deve enviar no header `Authorization: Bearer <valor>` ou `X-Webhook-Secret: <valor>`. |
 | `JWT_SECRET` | **Sim** (produção) | `openssl rand -hex 32` | Segredo para assinar o token de login. Em produção, use um valor forte e único. |
-| `OPENAI_API_KEY` | Não (cadastro por print) | `sk-...` | Chave da API OpenAI para extração de dados da publicação a partir de imagem (tela "Nova publicação por print"). Sem ela, o cadastro por print retorna erro 503. |
-| `OPENAI_VISION_MODEL` | Não | `gpt-4o` | Modelo de visão usado na extração (padrão: gpt-4o). |
+| `OPENAI_API_KEY` | Não (cadastro por print) | `sk-...` | Chave da API OpenAI para extração por print. Configure **uma** das duas (OpenAI ou Anthropic). |
+| `OPENAI_VISION_MODEL` | Não | `gpt-4o` | Modelo OpenAI na extração (padrão: gpt-4o). |
+| `ANTHROPIC_API_KEY` | Não (cadastro por print) | `sk-ant-api03-...` | Chave da API Anthropic (Claude) para extração por print. Configure **uma** das duas (OpenAI ou Anthropic). |
+| `CLAUDE_VISION_MODEL` | Não | `claude-sonnet-4-20250514` | Modelo Claude na extração (padrão: claude-sonnet-4-20250514). |
 | `PUBLICACOES_PRINT_PROMPT` | Não | — | Prompt customizado para a IA (sobrescreve o padrão). Útil para usar o mesmo prompt do N8N. |
 | CORS | — | — | A API usa o middleware `cors()` e aceita requisições de qualquer origem, para o frontend em outro domínio (EasyPanel) funcionar. |
 

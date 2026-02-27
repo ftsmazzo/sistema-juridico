@@ -30,49 +30,66 @@ export async function publicacaoPorPrint(
   }
 
   try {
-    const extracted = await extrairPublicacaoDeImagem(image, {
+    const extractedList = await extrairPublicacaoDeImagem(image, {
       provider: body.provider,
       model: body.model,
     });
-    const emailId = `print-${req.user.id}-${Date.now()}`;
-    const publicacaoNumero = 1;
+    if (!extractedList.length) {
+      res.status(400).json({ error: "Nenhuma publicação identificada na imagem." });
+      return;
+    }
 
-    const item: ItemPublicacaoOab = {
-      emailId,
-      isRecorteDigital: true,
-      publicacaoNumero,
-      numeroProcesso: extracted.numeroProcesso,
-      tipoPublicacao: extracted.tipoPublicacao,
-      vara: extracted.vara,
-      dataPublicacao: extracted.dataPublicacao,
-      dataDisponibilizacao: extracted.dataDisponibilizacao,
-      textoCompleto: extracted.textoCompleto,
-      jornal: extracted.jornal,
-      local: extracted.local,
-      resumo: extracted.resumo,
-      baseLegal: extracted.baseLegal,
-      prazoDiasUteisSugerido: extracted.prazoDiasUteisSugerido,
-      observacoesIa: extracted.observacoesIa,
-      movimentacoes: extracted.movimentacoes,
-    };
+    const baseEmailId = `print-${req.user.id}-${Date.now()}`;
+    const publicacaoIds: number[] = [];
+    const prazoIds: number[] = [];
+    const skipped: string[] = [];
 
-    const result = await processarItemPublicacaoOab(item);
-    if (result.skipped) {
+    for (let i = 0; i < extractedList.length; i++) {
+      const extracted = extractedList[i];
+      const item: ItemPublicacaoOab = {
+        emailId: `${baseEmailId}-${i + 1}`,
+        isRecorteDigital: true,
+        publicacaoNumero: i + 1,
+        numeroProcesso: extracted.numeroProcesso,
+        tipoPublicacao: extracted.tipoPublicacao,
+        vara: extracted.vara,
+        dataPublicacao: extracted.dataPublicacao,
+        dataDisponibilizacao: extracted.dataDisponibilizacao,
+        textoCompleto: extracted.textoCompleto,
+        jornal: extracted.jornal,
+        local: extracted.local,
+        resumo: extracted.resumo,
+        baseLegal: extracted.baseLegal,
+        prazoDiasUteisSugerido: extracted.prazoDiasUteisSugerido,
+        observacoesIa: extracted.observacoesIa,
+        movimentacoes: extracted.movimentacoes,
+      };
+
+      const result = await processarItemPublicacaoOab(item);
+      if (result.skipped) {
+        skipped.push(result.skipped);
+        continue;
+      }
+      if (result.publicacaoId) {
+        publicacaoIds.push(result.publicacaoId);
+        if (result.prazoIds?.length) prazoIds.push(...result.prazoIds);
+      }
+    }
+
+    if (publicacaoIds.length === 0) {
       res.status(409).json({
-        error: "Publicação duplicada ou já existente.",
-        skipped: result.skipped,
+        error: skipped.length ? "Todas as publicações já existem ou foram ignoradas." : "Falha ao gravar publicações.",
+        skipped: skipped.length ? skipped : undefined,
       });
       return;
     }
-    if (!result.publicacaoId) {
-      res.status(500).json({ error: "Falha ao gravar publicação." });
-      return;
-    }
 
+    const n = publicacaoIds.length;
     res.status(201).json({
-      publicacaoId: result.publicacaoId,
-      prazoIds: result.prazoIds ?? [],
-      message: "Publicação cadastrada com sucesso.",
+      publicacaoId: publicacaoIds[0],
+      publicacaoIds,
+      prazoIds,
+      message: n === 1 ? "Publicação cadastrada com sucesso." : `${n} publicações cadastradas com sucesso.`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro ao processar imagem.";

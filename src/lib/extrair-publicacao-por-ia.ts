@@ -12,26 +12,32 @@ import type { ItemPublicacaoOab } from "./publicacoes-oab.types.js";
 
 export type ProvedorIa = "openai" | "claude";
 
-/** Prompt alinhado ao usado no N8N: análise jurídica rica, resumo objetivo, observações úteis. */
+/** Prompt: análise jurídica rica; retorna ARRAY para suportar várias publicações na mesma imagem (como a automação N8N). */
 const PROMPT_PADRAO = `Você é um assistente jurídico especializado em análise de publicações do Diário da Justiça (Recorte Digital OAB/SP).
 
-Analise a IMAGEM (print ou foto da publicação) e extraia todas as informações visíveis. Retorne APENAS um objeto JSON válido, sem markdown, sem \`\`\`json, sem texto antes ou depois, com exatamente estas chaves:
+Analise a IMAGEM (print ou foto). A imagem pode conter UMA ou VÁRIAS publicações (ex.: "Publicação: 1", "Publicação: 2", ou vários processos/atos no mesmo recorte).
 
+Retorne APENAS um JSON válido, sem markdown, sem \`\`\`json, sem texto antes ou depois:
+
+- Se houver UMA publicação: um ARRAY com um objeto: [ { ... } ]
+- Se houver VÁRIAS publicações: um ARRAY com um objeto para cada publicação, na ordem em que aparecem na imagem: [ { ... }, { ... } ]
+
+Cada objeto do array deve ter exatamente estas chaves:
 - numeroProcesso (string, ex: 1000000-00.0000.0.00.0000)
 - tipoPublicacao (string, ex: Intimação, Decisão, Citação, Despacho)
 - vara (string)
 - dataPublicacao (string, DD/MM/YYYY)
-- dataDisponibilizacao (string, se aparecer na imagem)
-- textoCompleto (string: transcreva o texto principal da publicação)
+- dataDisponibilizacao (string, se aparecer)
+- textoCompleto (string: transcreva o texto principal dessa publicação)
 - jornal (string)
 - local (string)
-- resumo (string: duas a quatro frases objetivas para o advogado: (a) qual ato foi praticado; (b) o que a parte deve fazer, se houver; (c) prazo mencionado. Linguagem clara.)
-- baseLegal (string: artigo/lei citado no texto, ex.: Art. 231 CPC. Vazio se não houver. Não invente.)
-- prazoDiasUteisSugerido (number: dias úteis para cumprir o ato; 15 para intimações de contestar/manifestar quando não especificado; 0 se não houver prazo)
-- observacoesIa (string: urgência, valor da causa, riscos como extinção/revelia, necessidade de documentos. Vazio se nada relevante.)
-- movimentacoes (array de objetos { "tipo": string, "resumo": string }, ex.: [{ "tipo": "Intimação", "resumo": "Intimar as partes para apresentar contestação em 15 dias" }]. Se houver mais de um ato no texto, um objeto por ato.)
+- resumo (string: duas a quatro frases objetivas para o advogado: (a) qual ato; (b) o que a parte deve fazer; (c) prazo. Linguagem clara.)
+- baseLegal (string: artigo/lei citado. Vazio se não houver. Não invente.)
+- prazoDiasUteisSugerido (number: dias úteis; 15 para intimações quando não especificado; 0 se não houver prazo)
+- observacoesIa (string: urgência, valor da causa, riscos. Vazio se nada relevante.)
+- movimentacoes (array de { "tipo": string, "resumo": string }. Se vários atos no texto, um por ato.)
 
-Use null para campos não encontrados. movimentacoes: [] se não houver.`;
+Use null para campos não encontrados. movimentacoes: [] se não houver. Sempre retorne um array, mesmo que com um único elemento.`;
 
 type ExtracaoParsed = Partial<{
   numeroProcesso: string;
@@ -49,11 +55,12 @@ type ExtracaoParsed = Partial<{
   movimentacoes: { tipo: string; resumo: string }[];
 }>;
 
-function parseJsonFromResponse(text: string): ExtracaoParsed {
+function parseJsonFromResponse(text: string): ExtracaoParsed[] {
   let raw = text.trim();
   const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeBlock) raw = codeBlock[1].trim();
-  return JSON.parse(raw) as ExtracaoParsed;
+  const parsed = JSON.parse(raw) as ExtracaoParsed | ExtracaoParsed[];
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 function normalizarBase64(imageBase64: string): { data: string; mediaType: string } {
@@ -91,13 +98,13 @@ function mapParsedToItem(parsed: ExtracaoParsed): Partial<ItemPublicacaoOab> {
   };
 }
 
-/** Extração via OpenAI Vision. */
+/** Extração via OpenAI Vision. Retorna array (uma ou várias publicações). */
 async function extrairComOpenAI(
   base64Data: string,
   mediaType: string,
   prompt: string,
   model: string
-): Promise<Partial<ItemPublicacaoOab>> {
+): Promise<Partial<ItemPublicacaoOab>[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY não configurada. Configure para usar extração por print com OpenAI.");
@@ -105,9 +112,9 @@ async function extrairComOpenAI(
   const openai = new OpenAI({ apiKey });
   const response = await openai.chat.completions.create({
     model,
-    max_tokens: 2000,
+    max_tokens: 4000,
     messages: [
-      { role: "system", content: "Você retorna somente JSON válido, sem texto adicional." },
+      { role: "system", content: "Você retorna somente um array JSON válido, sem texto adicional." },
       {
         role: "user",
         content: [
@@ -122,17 +129,17 @@ async function extrairComOpenAI(
   });
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("Resposta da IA vazia.");
-  const parsed = parseJsonFromResponse(content);
-  return mapParsedToItem(parsed);
+  const parsedList = parseJsonFromResponse(content);
+  return parsedList.map(mapParsedToItem);
 }
 
-/** Extração via Claude (Anthropic Messages API) com imagem em base64. */
+/** Extração via Claude (Anthropic Messages API) com imagem em base64. Retorna array (uma ou várias publicações). */
 async function extrairComClaude(
   base64Data: string,
   mediaType: string,
   prompt: string,
   model: string
-): Promise<Partial<ItemPublicacaoOab>> {
+): Promise<Partial<ItemPublicacaoOab>[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY não configurada. Configure para usar extração por print com Claude.");
@@ -146,7 +153,7 @@ async function extrairComClaude(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [
         {
           role: "user",
@@ -175,8 +182,8 @@ async function extrairComClaude(
   const block = json.content?.find((c) => c?.type === "text");
   const content = block?.text;
   if (!content) throw new Error("Resposta da Claude vazia.");
-  const parsed = parseJsonFromResponse(content);
-  return mapParsedToItem(parsed);
+  const parsedList = parseJsonFromResponse(content);
+  return parsedList.map(mapParsedToItem);
 }
 
 export type OpcoesExtracao = {
@@ -186,13 +193,13 @@ export type OpcoesExtracao = {
 
 /**
  * Recebe imagem em base64 (com ou sem prefixo data:image/...;base64,).
- * Opcionalmente provider ('openai' | 'claude') e model (ex.: gpt-4o, claude-sonnet-4-20250514).
- * Retorna objeto parcial para montar ItemPublicacaoOab.
+ * Opcionalmente provider e model.
+ * Retorna array de objetos parciais (uma ou várias publicações na mesma imagem).
  */
 export async function extrairPublicacaoDeImagem(
   imageBase64: string,
   opcoes?: OpcoesExtracao
-): Promise<Partial<ItemPublicacaoOab>> {
+): Promise<Partial<ItemPublicacaoOab>[]> {
   const { data: base64Data, mediaType } = normalizarBase64(imageBase64);
   const prompt = process.env.PUBLICACOES_PRINT_PROMPT ?? PROMPT_PADRAO;
   const provider = opcoes?.provider ?? (process.env.OPENAI_API_KEY ? "openai" : "claude");
