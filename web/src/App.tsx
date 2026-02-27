@@ -8,6 +8,7 @@ import { DetalhePublicacao } from "@/pages/DetalhePublicacao";
 import { NovaPublicacao } from "@/pages/NovaPublicacao";
 import { Pessoas } from "@/pages/Pessoas";
 import { Usuarios } from "@/pages/Usuarios";
+import { Administracao } from "@/pages/Administracao";
 import { Login } from "@/pages/Login";
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="publicacoes/:id" element={<DetalhePublicacao />} />
           <Route path="pessoas" element={<Pessoas />} />
           <Route path="usuarios" element={<Usuarios />} />
+          <Route path="administracao" element={<Administracao />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

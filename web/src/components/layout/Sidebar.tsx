@@ -3,7 +3,8 @@ import { CalendarIcon } from "@/components/icons/CalendarIcon";
 import { DashboardIcon } from "@/components/icons/DashboardIcon";
 import { DocumentIcon } from "@/components/icons/DocumentIcon";
 import { UsersIcon } from "@/components/icons/UsersIcon";
-import { podeVerPessoas, podeVerUsuarios } from "@/lib/auth";
+import { SettingsIcon } from "@/components/icons/SettingsIcon";
+import { podeVerPessoas, podeVerUsuarios, isGestor } from "@/lib/auth";
 
 const baseNav = [
   { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
@@ -16,6 +17,7 @@ export function Sidebar() {
     ...baseNav,
     ...(podeVerPessoas() ? [{ to: "/pessoas" as const, label: "Pessoas" as const, Icon: UsersIcon }] : []),
     ...(podeVerUsuarios() ? [{ to: "/usuarios" as const, label: "Usuários" as const, Icon: UsersIcon }] : []),
+    ...(isGestor() ? [{ to: "/administracao" as const, label: "Administração" as const, Icon: SettingsIcon }] : []),
   ];
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-white/10 bg-[var(--sidebar-bg)] lg:block">

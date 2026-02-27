@@ -289,3 +289,8 @@ export function updateUsuario(
 ) {
   return api.patch<UsuarioListItem>(`/api/usuarios/${id}`, body);
 }
+
+// --- Admin (apenas Gestor) ---
+export function limparDados() {
+  return api.post<{ ok: boolean; message: string }>("/api/admin/limpar-dados");
+}

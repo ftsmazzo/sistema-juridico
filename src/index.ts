@@ -13,6 +13,7 @@ import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
 import { login } from "./routes/auth.js";
 import { listPessoas, createPessoa, updatePessoa } from "./routes/pessoas.js";
 import { listUsuarios, createUsuario, updateUsuario } from "./routes/usuarios.js";
+import { limparDados } from "./routes/admin/limpar-dados.js";
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -43,6 +44,8 @@ app.patch("/api/pessoas/:id", requireAuth, updatePessoa);
 app.get("/api/usuarios", requireAuth, listUsuarios);
 app.post("/api/usuarios", requireAuth, createUsuario);
 app.patch("/api/usuarios/:id", requireAuth, updateUsuario);
+
+app.post("/api/admin/limpar-dados", requireAuth, limparDados);
 
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
