@@ -13,6 +13,19 @@ import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
 import { login } from "./routes/auth.js";
 import { listPessoas, createPessoa, updatePessoa } from "./routes/pessoas.js";
 import { listUsuarios, getUsuarioById, createUsuario, updateUsuario } from "./routes/usuarios.js";
+import {
+  listClientes,
+  getClienteById,
+  createCliente,
+  updateCliente,
+} from "./routes/clientes.js";
+import {
+  listProcessos,
+  getProcessoById,
+  createProcesso,
+  updateProcesso,
+} from "./routes/processos.js";
+import { importarExcelProcessos } from "./routes/processos-importar.js";
 import { limparDados } from "./routes/admin/limpar-dados.js";
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
@@ -42,9 +55,20 @@ app.post("/api/pessoas", requireAuth, createPessoa);
 app.patch("/api/pessoas/:id", requireAuth, updatePessoa);
 
 app.get("/api/usuarios", requireAuth, listUsuarios);
-  app.get("/api/usuarios/:id", requireAuth, getUsuarioById);
-  app.post("/api/usuarios", requireAuth, createUsuario);
-  app.patch("/api/usuarios/:id", requireAuth, updateUsuario);
+app.get("/api/usuarios/:id", requireAuth, getUsuarioById);
+app.post("/api/usuarios", requireAuth, createUsuario);
+app.patch("/api/usuarios/:id", requireAuth, updateUsuario);
+
+app.get("/api/clientes", requireAuth, listClientes);
+app.get("/api/clientes/:id", requireAuth, getClienteById);
+app.post("/api/clientes", requireAuth, createCliente);
+app.patch("/api/clientes/:id", requireAuth, updateCliente);
+
+app.get("/api/processos", requireAuth, listProcessos);
+app.get("/api/processos/:id", requireAuth, getProcessoById);
+app.post("/api/processos", requireAuth, createProcesso);
+app.patch("/api/processos/:id", requireAuth, updateProcesso);
+app.post("/api/processos/importar-excel", requireAuth, importarExcelProcessos);
 
 app.post("/api/admin/limpar-dados", requireAuth, limparDados);
 

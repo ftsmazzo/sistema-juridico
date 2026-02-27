@@ -345,6 +345,107 @@ export function updateUsuario(
   return api.patch<UsuarioListItem>(`/api/usuarios/${id}`, body);
 }
 
+// --- Clientes ---
+export type ClienteListItem = {
+  id: number;
+  tipo: string;
+  nome: string;
+  razaoSocial: string | null;
+  cpf: string | null;
+  cnpj: string | null;
+  cidade: string | null;
+  estado: string | null;
+  ativo: boolean;
+};
+
+export function getClientes(params?: { q?: string; tipo?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.q) sp.set("q", params.q);
+  if (params?.tipo) sp.set("tipo", params.tipo);
+  const q = sp.toString();
+  return api.get<ClienteListItem[]>(`/api/clientes${q ? `?${q}` : ""}`);
+}
+
+export function getCliente(id: number) {
+  return api.get<ClienteListItem & Record<string, unknown>>(`/api/clientes/${id}`);
+}
+
+export function createCliente(body: Record<string, unknown>) {
+  return api.post<ClienteListItem>("/api/clientes", body);
+}
+
+export function updateCliente(id: number, body: Record<string, unknown>) {
+  return api.patch<ClienteListItem>(`/api/clientes/${id}`, body);
+}
+
+// --- Processos ---
+export type ProcessoListItem = {
+  id: number;
+  numeroCnj: string;
+  status: string;
+  tipo: string | null;
+  fase: string | null;
+  tipoAcao: string | null;
+  nomeCliente: string | null;
+  nomeAdvogado: string | null;
+  comarca: string | null;
+  vara: string | null;
+  dataPrazo: string | null;
+  dataInicio: string | null;
+};
+
+export type ProcessoDetalhe = ProcessoListItem & {
+  idCliente: number | null;
+  idAdvogadoResponsavel: number | null;
+  cliente: Record<string, unknown> | null;
+  advogado: { id: number; nomeCompleto: string; login: string } | null;
+  movimentacoes: { id: number; ordem: number; movimentacao: string | null; dataMovimentacao: string | null }[];
+  totalPrazos: number;
+  totalPublicacoes: number;
+  [key: string]: unknown;
+};
+
+export function getProcessos(params?: { q?: string; status?: string; idCliente?: number; idAdvogado?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.q) sp.set("q", params.q);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.idCliente != null) sp.set("idCliente", String(params.idCliente));
+  if (params?.idAdvogado != null) sp.set("idAdvogado", String(params.idAdvogado));
+  const q = sp.toString();
+  return api.get<ProcessoListItem[]>(`/api/processos${q ? `?${q}` : ""}`);
+}
+
+export function getProcesso(id: number) {
+  return api.get<ProcessoDetalhe>(`/api/processos/${id}`);
+}
+
+export function createProcesso(body: Record<string, unknown>) {
+  return api.post<ProcessoListItem>("/api/processos", body);
+}
+
+export function updateProcesso(id: number, body: Record<string, unknown>) {
+  return api.patch<ProcessoListItem>(`/api/processos/${id}`, body);
+}
+
+export type ResultadoImportacao = {
+  message: string;
+  clientesInseridos: number;
+  processosInseridos: number;
+  processosAtualizados: number;
+  movimentacoesInseridas: number;
+  erros: string[];
+};
+
+export function importarExcelProcessos(
+  fileBase64: string,
+  opcoes?: { importarClientes?: boolean; importarProcessos?: boolean; importarMovimentacoes?: boolean }
+) {
+  return api.post<ResultadoImportacao>("/api/processos/importar-excel", {
+    fileBase64,
+    ...opcoes,
+  });
+}
+
 // --- Admin (apenas Gestor) ---
 export function limparDados() {
   return api.post<{ ok: boolean; message: string }>("/api/admin/limpar-dados");

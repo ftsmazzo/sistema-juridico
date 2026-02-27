@@ -66,6 +66,7 @@ export const prazos = pgTable("prazos", {
     () => movimentacoes.id,
     { onDelete: "set null" }
   ),
+  processoId: integer("processo_id").references(() => processos.id, { onDelete: "set null" }),
   numeroProcesso: varchar("numero_processo", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -122,6 +123,92 @@ export const agenda = pgTable("agenda", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// --- Clientes (PF + PJ; espelha Clie-F e Clie-J da planilha) ---
+export const clientes = pgTable("clientes", {
+  id: serial("id").primaryKey(),
+  tipo: varchar("tipo", { length: 10 }).notNull(), // PF | PJ
+  // PF: nome completo; PJ: nome fantasia (exibição)
+  nome: varchar("nome", { length: 255 }).notNull(),
+  razaoSocial: varchar("razao_social", { length: 255 }),
+  cpf: varchar("cpf", { length: 20 }),
+  cnpj: varchar("cnpj", { length: 20 }),
+  sexo: varchar("sexo", { length: 5 }),
+  dataNascimento: date("data_nascimento"),
+  telefone: varchar("telefone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  endereco: varchar("endereco", { length: 255 }),
+  bairro: varchar("bairro", { length: 120 }),
+  cep: varchar("cep", { length: 20 }),
+  cidade: varchar("cidade", { length: 120 }),
+  estado: varchar("estado", { length: 5 }),
+  profissao: varchar("profissao", { length: 120 }),
+  estadoCivil: varchar("estado_civil", { length: 50 }),
+  segmentoAtuacao: varchar("segmento_atuacao", { length: 120 }),
+  responsavelLegal: varchar("responsavel_legal", { length: 255 }),
+  comoConheceu: varchar("como_conheceu", { length: 120 }),
+  observacoes: text("observacoes"),
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// --- Processos (espelha Proc-G; relaciona cliente + advogado responsável) ---
+export const processos = pgTable(
+  "processos",
+  {
+    id: serial("id").primaryKey(),
+    numeroCnj: varchar("numero_cnj", { length: 50 }).notNull().unique(),
+    status: varchar("status", { length: 30 }).notNull().default("Ativo"),
+    tipo: varchar("tipo", { length: 30 }),
+    fase: varchar("fase", { length: 80 }),
+    tipoAcao: varchar("tipo_acao", { length: 120 }),
+    tipoCliente: varchar("tipo_cliente", { length: 20 }),
+    idCliente: integer("id_cliente").references(() => clientes.id, { onDelete: "set null" }),
+    nomeCliente: varchar("nome_cliente", { length: 255 }),
+    qualificacaoCliente: varchar("qualificacao_cliente", { length: 60 }),
+    outroEnvolvido: varchar("outro_envolvido", { length: 255 }),
+    qualificacaoOutro: varchar("qualificacao_outro", { length: 60 }),
+    idAdvogadoResponsavel: integer("id_advogado_responsavel").references(() => usuarios.id, {
+      onDelete: "set null",
+    }),
+    nomeAdvogado: varchar("nome_advogado", { length: 255 }),
+    valorCausa: varchar("valor_causa", { length: 50 }),
+    valorAcordoSentenca: varchar("valor_acordo_sentenca", { length: 50 }),
+    valorHonorariosReais: varchar("valor_honorarios_reais", { length: 50 }),
+    valorHonorariosPercentual: varchar("valor_honorarios_percentual", { length: 30 }),
+    sucumbencias: varchar("sucumbencias", { length: 100 }),
+    totalHonorarios: varchar("total_honorarios", { length: 100 }),
+    prazoEmAberto: boolean("prazo_em_aberto"),
+    dataPrazo: date("data_prazo"),
+    instancia: varchar("instancia", { length: 80 }),
+    comarca: varchar("comarca", { length: 120 }),
+    vara: varchar("vara", { length: 120 }),
+    observacoes: text("observacoes"),
+    dataInicio: date("data_inicio"),
+    dataFim: date("data_fim"),
+    duracaoTexto: varchar("duracao_texto", { length: 50 }),
+    resultado: varchar("resultado", { length: 80 }),
+    linkProcesso: varchar("link_processo", { length: 500 }),
+    linkPastaDocumentos: varchar("link_pasta_documentos", { length: 500 }),
+    titulo: varchar("titulo", { length: 400 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("processos_numero_cnj_idx").on(t.numeroCnj)]
+);
+
+// --- Movimentações do processo (espelha Proc-M: histórico por processo) ---
+export const movimentacoesProcesso = pgTable("movimentacoes_processo", {
+  id: serial("id").primaryKey(),
+  idProcesso: integer("id_processo")
+    .notNull()
+    .references(() => processos.id, { onDelete: "cascade" }),
+  ordem: integer("ordem").notNull().default(1),
+  movimentacao: text("movimentacao"),
+  dataMovimentacao: date("data_movimentacao"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // --- Publicações OAB (Recorte Digital) ---
 export const publicacoesOab = pgTable(
   "publicacoes_oab",
@@ -158,6 +245,7 @@ export const publicacoesOab = pgTable(
     prazoDiasUteisSugerido: integer("prazo_dias_uteis_sugerido"),
     observacoesIa: text("observacoes_ia"),
     movimentacoes: jsonb("movimentacoes").$type<{ tipo: string; resumo: string }[]>(),
+    processoId: integer("processo_id").references(() => processos.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
@@ -216,6 +304,32 @@ export const usuariosRelations = relations(usuarios, ({ one, many }) => ({
   }),
   prazosUsuarios: many(prazosUsuarios),
   audienciasUsuarios: many(audienciasUsuarios),
+  processosResponsavel: many(processos),
+}));
+
+export const clientesRelations = relations(clientes, ({ many }) => ({
+  processos: many(processos),
+}));
+
+export const processosRelations = relations(processos, ({ one, many }) => ({
+  cliente: one(clientes, {
+    fields: [processos.idCliente],
+    references: [clientes.id],
+  }),
+  advogadoResponsavel: one(usuarios, {
+    fields: [processos.idAdvogadoResponsavel],
+    references: [usuarios.id],
+  }),
+  movimentacoesProcesso: many(movimentacoesProcesso),
+  prazos: many(prazos),
+  publicacoesOab: many(publicacoesOab),
+}));
+
+export const movimentacoesProcessoRelations = relations(movimentacoesProcesso, ({ one }) => ({
+  processo: one(processos, {
+    fields: [movimentacoesProcesso.idProcesso],
+    references: [processos.id],
+  }),
 }));
 
 export const prazosRelations = relations(prazos, ({ one, many }) => ({
@@ -226,6 +340,10 @@ export const prazosRelations = relations(prazos, ({ one, many }) => ({
   movimentacao: one(movimentacoes, {
     fields: [prazos.movimentacaoId],
     references: [movimentacoes.id],
+  }),
+  processo: one(processos, {
+    fields: [prazos.processoId],
+    references: [processos.id],
   }),
   prazosUsuarios: many(prazosUsuarios),
 }));
@@ -246,6 +364,10 @@ export const analiseIaPublicacaoRelations = relations(analiseIaPublicacao, ({ on
 }));
 
 export const publicacoesOabRelations = relations(publicacoesOab, ({ one, many }) => ({
+  processo: one(processos, {
+    fields: [publicacoesOab.processoId],
+    references: [processos.id],
+  }),
   prazos: many(prazos),
   movimentacoes: many(movimentacoes),
   analiseIa: one(analiseIaPublicacao),

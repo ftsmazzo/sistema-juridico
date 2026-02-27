@@ -2,6 +2,8 @@
 
 **Objetivo:** Entender de onde podem vir os prazos processuais no Brasil (OAB, tribunais, sistemas) e o que é viável usar por **API, dados abertos ou integração** — sem depender só de digitação manual.
 
+**Nota (2025):** DataJud foi avaliado como fora de questão (desatualizado/fraco); JusBrasil é pago e o modelo de consumo nem sempre é claro. Para **alternativas e ideias fora da caixa** (e-mail como fonte, colar intimação, bot, LexML, etc.), ver **`docs/ALTERNATIVAS_FONTES_DADOS_PRAZOS.md`**.
+
 ---
 
 ## 1. Resumo direto
