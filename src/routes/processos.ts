@@ -8,7 +8,7 @@ import {
   prazos,
   publicacoesOab,
 } from "../db/schema.js";
-import { eq, ilike, and, or, asc, desc, sql } from "drizzle-orm";
+import { eq, ilike, and, or, asc, desc, sql, lt, lte, gt, isNull } from "drizzle-orm";
 import type { RequestWithUser } from "../middleware/auth.js";
 import { podeCadastrarPessoas } from "../lib/roles.js";
 
@@ -46,6 +46,7 @@ export async function listProcessos(
     const status = req.query.status as string | undefined;
     const idCliente = req.query.idCliente as string | undefined;
     const idAdvogado = req.query.idAdvogado as string | undefined;
+    const semMovimentacao = req.query.semMovimentacao as string | undefined;
     const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
     const conditions = [];
     if (q) {
@@ -66,6 +67,40 @@ export async function listProcessos(
     }
     if (idAdvogado && Number.isInteger(Number(idAdvogado))) {
       conditions.push(eq(processos.idAdvogadoResponsavel, Number(idAdvogado)));
+    }
+    // Filtro por tempo sem movimentação (última mov. Escavador)
+    const hoje = new Date().toISOString().slice(0, 10);
+    const hojeDate = new Date(hoje + "T12:00:00Z");
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const menos30 = fmt(new Date(hojeDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+    const menos60 = fmt(new Date(hojeDate.getTime() - 60 * 24 * 60 * 60 * 1000));
+    const menos90 = fmt(new Date(hojeDate.getTime() - 90 * 24 * 60 * 60 * 1000));
+    const menos120 = fmt(new Date(hojeDate.getTime() - 120 * 24 * 60 * 60 * 1000));
+    if (semMovimentacao === "sem-info") {
+      conditions.push(isNull(processos.dataUltimaMovimentacao));
+    } else if (semMovimentacao === "30") {
+      conditions.push(
+        and(
+          lte(processos.dataUltimaMovimentacao!, menos30),
+          gt(processos.dataUltimaMovimentacao!, menos60)
+        )!
+      );
+    } else if (semMovimentacao === "60") {
+      conditions.push(
+        and(
+          lte(processos.dataUltimaMovimentacao!, menos60),
+          gt(processos.dataUltimaMovimentacao!, menos90)
+        )!
+      );
+    } else if (semMovimentacao === "90") {
+      conditions.push(
+        and(
+          lte(processos.dataUltimaMovimentacao!, menos90),
+          gt(processos.dataUltimaMovimentacao!, menos120)
+        )!
+      );
+    } else if (semMovimentacao === "120-mais") {
+      conditions.push(lte(processos.dataUltimaMovimentacao!, menos120));
     }
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

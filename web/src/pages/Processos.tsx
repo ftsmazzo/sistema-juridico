@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getProcessos,
@@ -26,8 +26,22 @@ function formatarData(iso: string | null) {
   });
 }
 
+const LABEL_SEM_MOV: Record<string, string> = {
+  "sem-info": "Sem informação de movimentação",
+  "30": "30 a 59 dias sem movimentação",
+  "60": "60 a 89 dias sem movimentação",
+  "90": "90 a 119 dias sem movimentação",
+  "120-mais": "120+ dias sem movimentação",
+};
+
 export function Processos() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const semMovimentacaoUrl = searchParams.get("semMovimentacao") ?? "";
+  const semMovimentacao =
+    semMovimentacaoUrl && ["sem-info", "30", "60", "90", "120-mais"].includes(semMovimentacaoUrl)
+      ? (semMovimentacaoUrl as "sem-info" | "30" | "60" | "90" | "120-mais")
+      : undefined;
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("");
   const [idCliente, setIdCliente] = useState<string>("");
@@ -53,7 +67,7 @@ export function Processos() {
   const [resultadoImport, setResultadoImport] = useState<ResultadoImportacao | null>(null);
 
   const { data: listData, isPending, isError, error } = useQuery({
-    queryKey: ["processos", q, status, idCliente, idAdvogado, page],
+    queryKey: ["processos", q, status, idCliente, idAdvogado, page, semMovimentacao],
     queryFn: () =>
       getProcessos({
         q: q || undefined,
@@ -61,6 +75,7 @@ export function Processos() {
         idCliente: idCliente ? Number(idCliente) : undefined,
         idAdvogado: idAdvogado ? Number(idAdvogado) : undefined,
         page,
+        semMovimentacao,
       }),
   });
   const list = listData?.items ?? [];
@@ -70,7 +85,7 @@ export function Processos() {
 
   useEffect(() => {
     setPage(1);
-  }, [q, status, idCliente, idAdvogado]);
+  }, [q, status, idCliente, idAdvogado, semMovimentacao]);
 
   /** Mensagem de erro amigável (API pode retornar JSON { error: "..." }) */
   const errorMessage = (() => {
@@ -316,6 +331,18 @@ export function Processos() {
             </option>
           ))}
         </select>
+        {semMovimentacao && (
+          <div className="flex w-full items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Filtro:</span>
+            <span className="font-medium text-foreground">{LABEL_SEM_MOV[semMovimentacao]}</span>
+            <Link
+              to="/processos"
+              className="ml-auto font-medium text-primary hover:underline"
+            >
+              Limpar filtro
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Dados gravados Escavador (cache) */}

@@ -6,7 +6,7 @@ import {
   processos,
   analiseIaPublicacao,
 } from "../db/schema.js";
-import { count, eq, gte, desc, and, isNotNull, inArray } from "drizzle-orm";
+import { count, eq, gte, desc, and, isNotNull, inArray, lte, gt, isNull, sql } from "drizzle-orm";
 
 export type DashboardTotais = {
   publicacoes: number;
@@ -33,10 +33,24 @@ export type SugestaoIa = {
   createdAt: string;
 };
 
+export type SemMovimentacaoBucket = {
+  totalProcessos: number;
+  totalPrazos: number;
+};
+
+export type AgrupamentoSemMovimentacao = {
+  semInformacao: SemMovimentacaoBucket;
+  dias30: SemMovimentacaoBucket;
+  dias60: SemMovimentacaoBucket;
+  dias90: SemMovimentacaoBucket;
+  dias120Mais: SemMovimentacaoBucket;
+};
+
 export type DashboardResponse = {
   totais: DashboardTotais;
   proximosPrazos: ProximoPrazo[];
   sugestoesIa: SugestaoIa[];
+  agrupamentoSemMovimentacao: AgrupamentoSemMovimentacao;
 };
 
 /**
@@ -116,6 +130,122 @@ export async function getDashboard(
       processos: processosCount,
     };
 
+    // Processos por tempo sem movimentação (data_ultima_movimentacao)
+    const hojeDate = new Date(hoje + "T12:00:00Z");
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const menos30 = fmt(new Date(hojeDate.getTime() - 30 * 24 * 60 * 60 * 1000));
+    const menos60 = fmt(new Date(hojeDate.getTime() - 60 * 24 * 60 * 60 * 1000));
+    const menos90 = fmt(new Date(hojeDate.getTime() - 90 * 24 * 60 * 60 * 1000));
+    const menos120 = fmt(new Date(hojeDate.getTime() - 120 * 24 * 60 * 60 * 1000));
+
+    const [semInfoProc] = await db
+      .select({ count: count() })
+      .from(processos)
+      .where(isNull(processos.dataUltimaMovimentacao));
+    const [dias30Proc] = await db
+      .select({ count: count() })
+      .from(processos)
+      .where(
+        and(
+          lte(processos.dataUltimaMovimentacao!, menos30),
+          gt(processos.dataUltimaMovimentacao!, menos60)
+        )
+      );
+    const [dias60Proc] = await db
+      .select({ count: count() })
+      .from(processos)
+      .where(
+        and(
+          lte(processos.dataUltimaMovimentacao!, menos60),
+          gt(processos.dataUltimaMovimentacao!, menos90)
+        )
+      );
+    const [dias90Proc] = await db
+      .select({ count: count() })
+      .from(processos)
+      .where(
+        and(
+          lte(processos.dataUltimaMovimentacao!, menos90),
+          gt(processos.dataUltimaMovimentacao!, menos120)
+        )
+      );
+    const [dias120Proc] = await db
+      .select({ count: count() })
+      .from(processos)
+      .where(lte(processos.dataUltimaMovimentacao!, menos120));
+
+    // Prazos cujo processo está em cada bucket (por processo_id ou numero_processo)
+    const semInfoPrazosResult = await db.execute<{ c: string }>(sql`
+      SELECT COUNT(*)::int AS c FROM prazos pr
+      WHERE EXISTS (
+        SELECT 1 FROM processos p
+        WHERE (pr.processo_id = p.id OR TRIM(COALESCE(pr.numero_processo,'')) = TRIM(p.numero_cnj))
+        AND p.data_ultima_movimentacao IS NULL
+      )
+    `);
+    const dias30PrazosResult = await db.execute<{ c: string }>(sql`
+      SELECT COUNT(*)::int AS c FROM prazos pr
+      WHERE EXISTS (
+        SELECT 1 FROM processos p
+        WHERE (pr.processo_id = p.id OR TRIM(COALESCE(pr.numero_processo,'')) = TRIM(p.numero_cnj))
+        AND p.data_ultima_movimentacao IS NOT NULL
+        AND p.data_ultima_movimentacao <= ${menos30}
+        AND p.data_ultima_movimentacao > ${menos60}
+      )
+    `);
+    const dias60PrazosResult = await db.execute<{ c: string }>(sql`
+      SELECT COUNT(*)::int AS c FROM prazos pr
+      WHERE EXISTS (
+        SELECT 1 FROM processos p
+        WHERE (pr.processo_id = p.id OR TRIM(COALESCE(pr.numero_processo,'')) = TRIM(p.numero_cnj))
+        AND p.data_ultima_movimentacao IS NOT NULL
+        AND p.data_ultima_movimentacao <= ${menos60}
+        AND p.data_ultima_movimentacao > ${menos90}
+      )
+    `);
+    const dias90PrazosResult = await db.execute<{ c: string }>(sql`
+      SELECT COUNT(*)::int AS c FROM prazos pr
+      WHERE EXISTS (
+        SELECT 1 FROM processos p
+        WHERE (pr.processo_id = p.id OR TRIM(COALESCE(pr.numero_processo,'')) = TRIM(p.numero_cnj))
+        AND p.data_ultima_movimentacao IS NOT NULL
+        AND p.data_ultima_movimentacao <= ${menos90}
+        AND p.data_ultima_movimentacao > ${menos120}
+      )
+    `);
+    const dias120PrazosResult = await db.execute<{ c: string }>(sql`
+      SELECT COUNT(*)::int AS c FROM prazos pr
+      WHERE EXISTS (
+        SELECT 1 FROM processos p
+        WHERE (pr.processo_id = p.id OR TRIM(COALESCE(pr.numero_processo,'')) = TRIM(p.numero_cnj))
+        AND p.data_ultima_movimentacao IS NOT NULL
+        AND p.data_ultima_movimentacao <= ${menos120}
+      )
+    `);
+
+    const agrupamentoSemMovimentacao: AgrupamentoSemMovimentacao = {
+      semInformacao: {
+        totalProcessos: semInfoProc?.count ?? 0,
+        totalPrazos: parseInt(semInfoPrazosResult.rows[0]?.c ?? "0", 10),
+      },
+      dias30: {
+        totalProcessos: dias30Proc?.count ?? 0,
+        totalPrazos: parseInt(dias30PrazosResult.rows[0]?.c ?? "0", 10),
+      },
+      dias60: {
+        totalProcessos: dias60Proc?.count ?? 0,
+        totalPrazos: parseInt(dias60PrazosResult.rows[0]?.c ?? "0", 10),
+      },
+      dias90: {
+        totalProcessos: dias90Proc?.count ?? 0,
+        totalPrazos: parseInt(dias90PrazosResult.rows[0]?.c ?? "0", 10),
+      },
+      dias120Mais: {
+        totalProcessos: dias120Proc?.count ?? 0,
+        totalPrazos: parseInt(dias120PrazosResult.rows[0]?.c ?? "0", 10),
+      },
+    };
+
     const sugestoesIa: SugestaoIa[] = sugestoes.map((s) => ({
       id: s.id,
       publicacaoOabId: s.publicacaoOabId,
@@ -136,6 +266,7 @@ export async function getDashboard(
         status: p.status,
       })),
       sugestoesIa,
+      agrupamentoSemMovimentacao,
     });
   } catch (err) {
     console.error("Dashboard error:", err);

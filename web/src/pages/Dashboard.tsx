@@ -38,7 +38,20 @@ export function Dashboard() {
     processos: 0,
   };
   const proximosPrazos = data?.proximosPrazos ?? [];
-  const sugestoesIa = data?.sugestoesIa ?? [];
+  const agrupamento = data?.agrupamentoSemMovimentacao ?? {
+    semInformacao: { totalProcessos: 0, totalPrazos: 0 },
+    dias30: { totalProcessos: 0, totalPrazos: 0 },
+    dias60: { totalProcessos: 0, totalPrazos: 0 },
+    dias90: { totalProcessos: 0, totalPrazos: 0 },
+    dias120Mais: { totalProcessos: 0, totalPrazos: 0 },
+  };
+  const linhasSemMov = [
+    { key: "sem-info" as const, label: "Sem informação de movimentação", ...agrupamento.semInformacao },
+    { key: "30" as const, label: "30 a 59 dias sem movimentação", ...agrupamento.dias30 },
+    { key: "60" as const, label: "60 a 89 dias sem movimentação", ...agrupamento.dias60 },
+    { key: "90" as const, label: "90 a 119 dias sem movimentação", ...agrupamento.dias90 },
+    { key: "120-mais" as const, label: "120+ dias sem movimentação", ...agrupamento.dias120Mais },
+  ];
 
   const user = getUser();
   const nomeUsuario = user?.pessoa
@@ -55,10 +68,10 @@ export function Dashboard() {
           {nomeUsuario ? (
             <>
               Olá, <span className="font-medium text-foreground">{nomeUsuario}</span>.
-              Aqui está sua visão de publicações OAB, prazos e observações da análise por IA.
+              Aqui está sua visão de publicações OAB, prazos e processos.
             </>
           ) : (
-            "Publicações OAB, prazos e observações da análise por IA."
+            "Publicações OAB, prazos e processos."
           )}
         </p>
       </div>
@@ -162,49 +175,49 @@ export function Dashboard() {
           </div>
         </section>
 
-        {/* Sugestões / Observações da IA */}
+        {/* Processos por tempo sem movimentação */}
         <section className="rounded-xl border border-border bg-card shadow-sm">
           <div className="border-b border-border px-6 py-4">
             <h3 className="font-semibold text-foreground">
-              Sugestões da análise por IA
+              Processos por tempo sem movimentação
             </h3>
             <p className="text-sm text-muted-foreground">
-              Recomendações e observações das publicações analisadas
+              Agrupamento pela última movimentação (Escavador). Processos e prazos em cada faixa.
             </p>
           </div>
-          <div className="p-4">
+          <div className="overflow-x-auto p-4">
             {isPending ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Carregando…
               </p>
-            ) : sugestoesIa.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Nenhuma sugestão ou observação no momento.
-              </p>
             ) : (
-              <ul className="space-y-4">
-                {sugestoesIa.map((s) => (
-                  <li
-                    key={s.id}
-                    className="rounded-lg border border-border/60 bg-muted/20 p-4"
-                  >
-                    {s.numeroProcesso && (
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        Processo {s.numeroProcesso}
-                      </p>
-                    )}
-                    {s.resumo && (
-                      <p className="mb-2 text-sm text-foreground">{s.resumo}</p>
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      {s.observacoesIa}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {formatarData(s.createdAt.slice(0, 10))}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="px-4 py-2 font-medium text-foreground">Situação</th>
+                    <th className="px-4 py-2 font-medium text-foreground text-right tabular-nums">Processos</th>
+                    <th className="px-4 py-2 font-medium text-foreground text-right tabular-nums">Prazos</th>
+                    <th className="px-4 py-2 font-medium text-foreground w-24"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhasSemMov.map((linha) => (
+                    <tr key={linha.key} className="border-b border-border/60 hover:bg-muted/20">
+                      <td className="px-4 py-3 text-foreground">{linha.label}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{linha.totalProcessos}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{linha.totalPrazos}</td>
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/processos?semMovimentacao=${linha.key}`}
+                          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50"
+                        >
+                          Detalhes
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </section>

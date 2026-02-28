@@ -97,10 +97,24 @@ export type SugestaoIa = {
   createdAt: string;
 };
 
+export type SemMovimentacaoBucket = {
+  totalProcessos: number;
+  totalPrazos: number;
+};
+
+export type AgrupamentoSemMovimentacao = {
+  semInformacao: SemMovimentacaoBucket;
+  dias30: SemMovimentacaoBucket;
+  dias60: SemMovimentacaoBucket;
+  dias90: SemMovimentacaoBucket;
+  dias120Mais: SemMovimentacaoBucket;
+};
+
 export type DashboardResponse = {
   totais: DashboardTotais;
   proximosPrazos: ProximoPrazo[];
   sugestoesIa: SugestaoIa[];
+  agrupamentoSemMovimentacao: AgrupamentoSemMovimentacao;
 };
 
 /** Dados do dashboard (totais, próximos prazos, sugestões da IA) */
@@ -419,6 +433,7 @@ export function getProcessos(params?: {
   idCliente?: number;
   idAdvogado?: number;
   page?: number;
+  semMovimentacao?: "sem-info" | "30" | "60" | "90" | "120-mais";
 }) {
   const sp = new URLSearchParams();
   if (params?.q) sp.set("q", params.q);
@@ -426,6 +441,7 @@ export function getProcessos(params?: {
   if (params?.idCliente != null) sp.set("idCliente", String(params.idCliente));
   if (params?.idAdvogado != null) sp.set("idAdvogado", String(params.idAdvogado));
   if (params?.page != null && params.page >= 1) sp.set("page", String(params.page));
+  if (params?.semMovimentacao) sp.set("semMovimentacao", params.semMovimentacao);
   const q = sp.toString();
   return api.get<ProcessoListResponse>(`/api/processos${q ? `?${q}` : ""}`);
 }
