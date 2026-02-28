@@ -33,6 +33,7 @@ import {
   sincronizarDadosEscavador,
 } from "./routes/dados-escavador.js";
 import { limparDados } from "./routes/admin/limpar-dados.js";
+import { emailMonitorTest } from "./routes/email-monitor-test.js";
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -82,6 +83,8 @@ app.post("/api/dados-escavador", requireAuth, salvarDadosEscavador);
 app.post("/api/dados-escavador/sincronizar", requireAuth, sincronizarDadosEscavador);
 
 app.post("/api/admin/limpar-dados", requireAuth, limparDados);
+
+app.post("/api/email-monitor/test", requireAuth, emailMonitorTest);
 
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
