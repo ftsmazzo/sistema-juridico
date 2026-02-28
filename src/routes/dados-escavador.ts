@@ -43,11 +43,11 @@ function parseDateString(s: string | null | undefined): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-/** Converte para string ISO (schema timestamp aceita string) ou null */
-function parseTimestampString(s: string | null | undefined): string | null {
+/** Converte para Date (schema timestamp espera Date) ou null */
+function parseTimestampToDate(s: string | null | undefined): Date | null {
   if (!s || typeof s !== "string") return null;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+  return isNaN(d.getTime()) ? null : d;
 }
 
 /** Grava payload no banco (upsert). Usado por POST /dados-escavador e por /dados-escavador/sincronizar. */
@@ -63,7 +63,7 @@ export async function gravarPayloadDadosEscavador(
 
     const dataInicio = parseDateString(item.data_inicio);
     const dataUltimaMov = parseDateString(item.data_ultima_movimentacao);
-    const dataUltimaVerif = parseTimestampString(item.data_ultima_verificacao);
+    const dataUltimaVerif = parseTimestampToDate(item.data_ultima_verificacao);
 
     const row = {
       numeroCnj: item.numero_cnj,
