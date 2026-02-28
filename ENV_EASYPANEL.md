@@ -18,7 +18,7 @@ Use estas variáveis no painel do EasyPanel em **Variables** (ou **Environment**
 | `ANTHROPIC_API_KEY` | Não (cadastro por print) | `sk-ant-api03-...` | Chave da API Anthropic (Claude) para extração por print. Configure **uma** das duas (OpenAI ou Anthropic). |
 | `CLAUDE_VISION_MODEL` | Não | `claude-sonnet-4-20250514` | Modelo Claude na extração (padrão: claude-sonnet-4-20250514). |
 | `PUBLICACOES_PRINT_PROMPT` | Não | — | Prompt customizado para a IA (sobrescreve o padrão). Útil para usar o mesmo prompt do N8N. |
-| `ESCAVADOR_API_KEY` ou `ESCAVADOR_TOKEN` | Não (sincronizar Escavador) | `eyJ0eXAi...` (Bearer token) | Token da API Escavador para o endpoint **POST /api/dados-escavador/sincronizar** (buscar processos por OAB direto no sistema, sem N8N). |
+| `ESCAVADOR_API_KEY` ou `ESCAVADOR_TOKEN` | Não (sincronizar Escavador) | `eyJ0eXAi...` (Bearer token) | Token da API Escavador para **POST /api/dados-escavador/sincronizar**. Obtenha em [api.escavador.com/tokens](https://api.escavador.com/tokens). **Importante:** defina como variável de **runtime** do serviço da API (não só Build Args). Cole o token sem espaços ou quebras de linha. Se aparecer 401 Unauthenticated, confira que a variável está nas env do **container** (não do build) e reinicie o serviço. |
 | CORS | — | — | A API usa o middleware `cors()` e aceita requisições de qualquer origem, para o frontend em outro domínio (EasyPanel) funcionar. |
 
 ### Exemplo de bloco (API)
@@ -58,3 +58,4 @@ VITE_API_URL=https://fabricaia-sistema-juridico.90qhxz.easypanel.host
 
 - **PostgreSQL:** Crie o banco `agenda_prazos` no serviço Postgres do EasyPanel antes do primeiro deploy. Use em `DATABASE_URL` o **nome do serviço** como host (ex.: `fabricaia_postgres`). As **tabelas são criadas/atualizadas automaticamente** na subida da API (todas as migrações em `drizzle/*.sql` rodam na inicialização).
 - **WEBHOOK_PUBLICACOES_OAB_SECRET:** Gere um valor aleatório forte (ex.: `openssl rand -hex 32`) e use o mesmo no N8N ao chamar o webhook.
+- **Escavador 401 Unauthenticated:** O token deve estar nas **variáveis de ambiente do serviço (runtime)** da API, não apenas nos Build Args. No EasyPanel: Variables do app/serviço da API. Copie o token do painel do Escavador sem espaços no início/fim. Após alterar, reinicie o container.

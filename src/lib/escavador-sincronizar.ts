@@ -70,11 +70,15 @@ export async function buscarProcessosPorOab(
   oabNumero: string,
   token: string
 ): Promise<DadosEscavadorPayload & { _meta?: { next_page?: string } }> {
+  const tokenTrimmed = typeof token === "string" ? token.trim() : "";
+  if (!tokenTrimmed) {
+    throw new Error("Token Escavador vazio. Verifique ESCAVADOR_API_KEY ou ESCAVADOR_TOKEN.");
+  }
   const url = `${ESCAVADOR_BASE}/advogado/processos?oab_estado=${encodeURIComponent(oabUf)}&oab_numero=${encodeURIComponent(oabNumero)}`;
   const res = await fetch(url, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${tokenTrimmed}`,
       "X-Requested-With": "XMLHttpRequest",
     },
   });

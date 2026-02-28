@@ -217,11 +217,12 @@ export async function sincronizarDadosEscavador(
       return;
     }
 
-    const token = process.env.ESCAVADOR_API_KEY || process.env.ESCAVADOR_TOKEN;
-    if (!token?.trim()) {
+    const tokenRaw = process.env.ESCAVADOR_API_KEY || process.env.ESCAVADOR_TOKEN;
+    const token = typeof tokenRaw === "string" ? tokenRaw.trim() : "";
+    if (!token) {
       res.status(503).json({
         error:
-          "ESCAVADOR_API_KEY (ou ESCAVADOR_TOKEN) não configurada. Defina no ambiente para sincronizar direto pelo sistema.",
+          "ESCAVADOR_API_KEY (ou ESCAVADOR_TOKEN) não configurada ou vazia. Defina no ambiente (EasyPanel: variáveis do serviço, não do build) e reinicie o container.",
       });
       return;
     }
