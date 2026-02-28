@@ -167,13 +167,15 @@ export async function buscarProcessosPorOab(
 }
 
 /**
- * Busca todas as páginas de processos por OAB e retorna um único payload com todos os itens.
+ * Busca até maxPages páginas de processos por OAB e retorna um único payload.
  * A API Escavador retorna em geral 20 itens por página (links.next para a próxima).
+ * @param maxPages Máximo de páginas a buscar (ex.: 2 para testar consumo). Se não informado, busca todas.
  */
 export async function buscarTodasAsPaginasProcessosPorOab(
   oabUf: string,
   oabNumero: string,
-  token: string
+  token: string,
+  maxPages?: number
 ): Promise<DadosEscavadorPayload> {
   const tokenTrimmed = normalizeToken(token);
   if (!tokenTrimmed) {
@@ -192,13 +194,16 @@ export async function buscarTodasAsPaginasProcessosPorOab(
     oab_numero: oabNumero,
   };
   const allItems: DadosEscavadorPayload["items"] = [];
+  let pagesFetched = 0;
 
   while (nextUrl) {
+    if (maxPages != null && maxPages > 0 && pagesFetched >= maxPages) break;
     const res = await fetch(nextUrl, { method: "GET", headers });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Escavador API ${res.status}: ${text || res.statusText}`);
     }
+    pagesFetched += 1;
     const raw = (await res.json()) as EscavadorResponse | EscavadorResponse[];
     const data: EscavadorResponse = Array.isArray(raw) ? raw[0] : raw;
     const parsed = parseResponseToPayload(data, oabUf, oabNumero);

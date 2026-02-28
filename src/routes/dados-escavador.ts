@@ -258,7 +258,8 @@ export async function sincronizarDadosEscavador(
 
     for (const { oab_uf, oab_numero } of list) {
       try {
-        const payload = await buscarTodasAsPaginasProcessosPorOab(oab_uf, oab_numero, token);
+        // Limite de 2 páginas para testar consumo de saldo Escavador; depois pode subir ou virar parâmetro
+        const payload = await buscarTodasAsPaginasProcessosPorOab(oab_uf, oab_numero, token, 2);
         const { processados, advogadoLabel } = await gravarPayloadDadosEscavador({
           advogado: payload.advogado,
           items: payload.items,
