@@ -328,6 +328,8 @@ export function Processos() {
                     <th className="px-3 py-2 font-medium text-foreground">Nº CNJ</th>
                     <th className="px-3 py-2 font-medium text-foreground">Advogado</th>
                     <th className="px-3 py-2 font-medium text-foreground">OAB</th>
+                    <th className="hidden px-3 py-2 font-medium text-foreground lg:table-cell">Polo ativo</th>
+                    <th className="hidden px-3 py-2 font-medium text-foreground lg:table-cell">Polo passivo</th>
                     <th className="hidden px-3 py-2 font-medium text-foreground md:table-cell">Comarca / Vara</th>
                     <th className="px-3 py-2 font-medium text-foreground">Últ. mov.</th>
                   </tr>
@@ -339,6 +341,12 @@ export function Processos() {
                       <td className="px-3 py-2 text-foreground">{r.advogadoNome ?? "—"}</td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {[r.advogadoOabUf, r.advogadoOabNumero].filter(Boolean).join(" ") || "—"}
+                      </td>
+                      <td className="hidden max-w-[200px] truncate px-3 py-2 text-muted-foreground lg:table-cell" title={r.tituloPoloAtivo ?? undefined}>
+                        {r.tituloPoloAtivo ?? "—"}
+                      </td>
+                      <td className="hidden max-w-[200px] truncate px-3 py-2 text-muted-foreground lg:table-cell" title={r.tituloPoloPassivo ?? undefined}>
+                        {r.tituloPoloPassivo ?? "—"}
                       </td>
                       <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">
                         {[r.comarca, r.vara].filter(Boolean).join(" / ") || "—"}

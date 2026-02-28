@@ -453,6 +453,8 @@ export type DadosEscavadorListItem = {
   advogadoNome: string | null;
   advogadoOabUf: string | null;
   advogadoOabNumero: string | null;
+  tituloPoloAtivo: string | null;
+  tituloPoloPassivo: string | null;
   dataInicio: string | null;
   dataUltimaMovimentacao: string | null;
   comarca: string | null;
