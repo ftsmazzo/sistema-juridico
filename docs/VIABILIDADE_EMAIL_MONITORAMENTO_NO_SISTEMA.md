@@ -11,6 +11,17 @@ Em vez do advogado configurar tudo no N8N (conta de e-mail, remetentes, workflow
 
 ---
 
+## Provedores de e-mail na prática
+
+- **Gmail** foi usado na automação atual só porque a pessoa que mandou os e-mails de teste usava Gmail (desenvolvimento).
+- **Na prática, os advogados usam:**
+  - **Yahoo** (conta pessoal/profissional)
+  - **E-mail institucional da OAB** (ex.: `@adv.oabsp.org.br` ou o domínio que a OAB fornece)
+
+Por isso o desenho do monitoramento deve **priorizar IMAP** (funciona para Yahoo, e-mail da OAB e a maioria dos provedores). Gmail API / OAuth pode ser opcional depois, se fizer sentido para quem usar Gmail.
+
+---
+
 ## Viabilidade técnica: **sim**
 
 ### O que já existe no sistema
@@ -23,7 +34,7 @@ Em vez do advogado configurar tudo no N8N (conta de e-mail, remetentes, workflow
 
 Ou seja: o “cérebro” (extrair do HTML/texto → `ItemPublicacaoOab` → processar) já existe. Falta só:
 
-1. **Conectar ao e-mail** (IMAP ou Gmail API)
+1. **Conectar ao e-mail** (IMAP — Yahoo, OAB, etc.; Gmail API opcional)
 2. **Agendar** a verificação periódica
 3. **Persistir** configurações (contas + remetentes) e **expor UX** para o advogado
 
@@ -31,7 +42,7 @@ Ou seja: o “cérebro” (extrair do HTML/texto → `ItemPublicacaoOab` → pro
 
 | Camada | O quê |
 |--------|------|
-| **Backend** | Módulo de leitura de e-mail (IMAP e/ou Gmail API); job agendado (ex.: a cada X min); port do extrator N8N para Node (entrada: corpo do e-mail; saída: `ItemPublicacaoOab[]`); reutilizar `processarItemPublicacaoOab` para cada item |
+| **Backend** | Módulo de leitura de e-mail por **IMAP** (Yahoo, OAB, provedores genéricos); job agendado (ex.: a cada X min); port do extrator N8N para Node (entrada: corpo do e-mail; saída: `ItemPublicacaoOab[]`); reutilizar `processarItemPublicacaoOab` para cada item. Gmail API opcional depois. |
 | **Banco** | Tabela(s) para: conta de e-mail (id, usuario_id, email, senha_criptografada ou refresh_token, remetentes_filtro, ultima_verificacao, ultimo_erro, ativo); opcional: log dos últimos e-mails processados por conta |
 | **API** | CRUD de “contas de monitoramento”; endpoint interno ou job que roda a verificação (e atualiza última verificação / último erro) |
 | **Frontend** | Tela “Monitoramento de e-mail”: listar contas, adicionar/editar (e-mail, remetentes, ativo), exibir última verificação, últimos e-mails/publicações; opcional: histórico de erros |
@@ -41,8 +52,8 @@ Ou seja: o “cérebro” (extrair do HTML/texto → `ItemPublicacaoOab` → pro
 ## Segurança e credenciais
 
 - **Senha em texto plano** não pode. Opções:
-  - **Criptografia no backend**: senha armazenada criptografada (ex.: AES com chave em env); descriptografar só na hora de conectar no job.
-  - **OAuth (Gmail)**: preferível quando for só Gmail — usuário autoriza uma vez; guardamos apenas `refresh_token`; não armazenamos senha.
+  - **Criptografia no backend** (principal para Yahoo e e-mail OAB): senha armazenada criptografada (ex.: AES com chave em env); descriptografar só na hora de conectar no job via IMAP.
+  - **OAuth (Gmail)** (opcional): para quem usar Gmail — usuário autoriza uma vez; guardamos apenas `refresh_token`; não armazenamos senha.
 - **Remetentes**: guardar como lista (ex.: `oabsp@recortedigital.adv.br`, `@trt*.jus.br`) para filtrar quais e-mails processar.
 - **Escopo por usuário**: cada conta de monitoramento vinculada ao usuário (advogado) logado; só ele vê e edita as próprias contas.
 
@@ -51,7 +62,7 @@ Ou seja: o “cérebro” (extrair do HTML/texto → `ItemPublicacaoOab` → pro
 ## Fluxo de dados (visão geral)
 
 ```
-[Caixa de e-mail] → (IMAP ou Gmail API) → Backend lê mensagens
+[Caixa de e-mail: Yahoo / OAB / etc.] → IMAP → Backend lê mensagens
        → Filtra por remetente/configuração
        → Para cada e-mail: extrator (port do N8N) → ItemPublicacaoOab[]
        → Para cada item: processarItemPublicacaoOab() → publicacoes_oab + prazos
@@ -73,7 +84,7 @@ O webhook atual pode continuar existindo: N8N e o sistema interno podem **ambos*
   - Botões: Editar, Pausar/Ativar, “Ver últimos e-mails”
 - **Adicionar/Editar conta**:
   - E-mail
-  - Senha (ou fluxo OAuth “Conectar com Google”)
+  - Senha (criptografada no backend). Opcional depois: “Conectar com Google” para Gmail.
   - Lista de remetentes a monitorar (com sugestão: “Recorte Digital OAB/SP”)
   - Ativo sim/não
 - **Detalhe / histórico**: últimos e-mails processados (subject, data), quantas publicações foram extraídas e link para as publicações/prazos criados.
@@ -86,7 +97,7 @@ Isso deixa tudo “bonito, organizado e linkado no sistema”, como você descre
 
 | Risco | Mitigação |
 |-------|-----------|
-| Bloqueio por “app menos seguro” / 2FA | Preferir OAuth (Gmail); para IMAP genérico, orientar “senha de app” ou conta com 2FA configurado para gerar senha de app |
+| Bloqueio por “app menos seguro” / 2FA | Para Yahoo/OAB (IMAP): orientar “senha de app” ou configuração de acesso de terceiros conforme o provedor. Gmail: OAuth evita senha. |
 | Rate limit / bloqueio da caixa | Intervalo mínimo entre verificações (ex.: 5–15 min); uma fila/job por conta |
 | Extrator quebrar se o Recorte mudar o layout | Manter extrator isolado (módulo); testes com amostras reais; fallback “não reconheceu” e log para ajuste de regex |
 | Vários advogados, muitas contas | Job único que percorre contas ativas; limites por plano/usuário se precisar no futuro |
@@ -105,8 +116,10 @@ Isso deixa tudo “bonito, organizado e linkado no sistema”, como você descre
    - Histórico de erros e link para publicações/prazos gerados.
 
 3. **Fase 3**
-   - OAuth Gmail (opcional) para não armazenar senha.
+   - OAuth Gmail (opcional), para quem usar Gmail.
    - Ajustes de UX (filtros, busca, notificações).
+
+**Nota:** O foco do MVP é **IMAP** (Yahoo + e-mail da OAB), que é o uso real dos advogados.
 
 ---
 
