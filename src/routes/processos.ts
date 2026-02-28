@@ -130,14 +130,29 @@ export async function getProcessoById(
       .from(movimentacoesProcesso)
       .where(eq(movimentacoesProcesso.idProcesso, id))
       .orderBy(asc(movimentacoesProcesso.ordem), asc(movimentacoesProcesso.id));
+    const numeroCnjNorm = (proc.numeroCnj ?? "").trim();
     const [{ count: countPrazos }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(prazos)
-      .where(eq(prazos.processoId, id));
+      .where(
+        numeroCnjNorm
+          ? or(
+              eq(prazos.processoId, id),
+              sql`trim(coalesce(${prazos.numeroProcesso}, '')) = ${numeroCnjNorm}`
+            )
+          : eq(prazos.processoId, id)
+      );
     const [{ count: countPublicacoes }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(publicacoesOab)
-      .where(eq(publicacoesOab.processoId, id));
+      .where(
+        numeroCnjNorm
+          ? or(
+              eq(publicacoesOab.processoId, id),
+              sql`trim(coalesce(${publicacoesOab.numeroProcesso}, '')) = ${numeroCnjNorm}`
+            )
+          : eq(publicacoesOab.processoId, id)
+      );
     res.json({
       ...proc,
       cliente: cliente ?? null,
