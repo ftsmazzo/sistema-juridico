@@ -446,6 +446,23 @@ export function importarExcelProcessos(
   });
 }
 
+// --- Dados Escavador (sincronizar por OAB) ---
+export type SincronizarEscavadorResultado = {
+  oab_uf: string;
+  oab_numero: string;
+  processados: number;
+  total_items: number;
+  advogado: string;
+  erro?: string;
+};
+
+export function sincronizarDadosEscavador(body: { oab_uf: string; oab_numero: string } | { advogados: Array<{ oab_uf: string; oab_numero: string }> }) {
+  return api.post<{ ok: boolean; resultados: SincronizarEscavadorResultado[] }>(
+    "/api/dados-escavador/sincronizar",
+    body
+  );
+}
+
 // --- Admin (apenas Gestor) ---
 export function limparDados() {
   return api.post<{ ok: boolean; message: string }>("/api/admin/limpar-dados");

@@ -9,8 +9,10 @@ import {
   createProcesso,
   updateProcesso,
   importarExcelProcessos,
+  sincronizarDadosEscavador,
   type ProcessoListItem,
   type ResultadoImportacao,
+  type SincronizarEscavadorResultado,
 } from "@/lib/api";
 
 function formatarData(iso: string | null) {
@@ -30,7 +32,11 @@ export function Processos() {
   const [idAdvogado, setIdAdvogado] = useState<string>("");
   const [modalProcesso, setModalProcesso] = useState(false);
   const [modalImportar, setModalImportar] = useState(false);
+  const [modalEscavador, setModalEscavador] = useState(false);
   const [editing, setEditing] = useState<ProcessoListItem | null>(null);
+  const [escavadorOabUf, setEscavadorOabUf] = useState("");
+  const [escavadorOabNumero, setEscavadorOabNumero] = useState("");
+  const [resultadoEscavador, setResultadoEscavador] = useState<SincronizarEscavadorResultado[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [opcoesImport, setOpcoesImport] = useState({
@@ -40,7 +46,7 @@ export function Processos() {
   });
   const [resultadoImport, setResultadoImport] = useState<ResultadoImportacao | null>(null);
 
-  const { data: list = [], isPending, isError } = useQuery({
+  const { data: list = [], isPending, isError, error } = useQuery({
     queryKey: ["processos", q, status, idCliente, idAdvogado],
     queryFn: () =>
       getProcessos({
@@ -50,6 +56,19 @@ export function Processos() {
         idAdvogado: idAdvogado ? Number(idAdvogado) : undefined,
       }),
   });
+
+  /** Mensagem de erro amigável (API pode retornar JSON { error: "..." }) */
+  const errorMessage = (() => {
+    if (!error?.message) return null;
+    const msg = String(error.message);
+    try {
+      const j = JSON.parse(msg);
+      if (j && typeof j.error === "string") return j.error;
+    } catch {
+      // não é JSON
+    }
+    return msg.length > 200 ? `${msg.slice(0, 200)}…` : msg;
+  })();
 
   const { data: clientesList = [] } = useQuery({
     queryKey: ["clientes"],
@@ -108,6 +127,20 @@ export function Processos() {
     },
   });
 
+  const escavadorMutation = useMutation({
+    mutationFn: () =>
+      sincronizarDadosEscavador({
+        oab_uf: escavadorOabUf.trim(),
+        oab_numero: escavadorOabNumero.trim(),
+      }),
+    onSuccess: (data) => {
+      setResultadoEscavador(data.resultados ?? null);
+    },
+    onError: () => {
+      setResultadoEscavador(null);
+    },
+  });
+
   function openNew() {
     setEditing(null);
     setModalProcesso(true);
@@ -158,6 +191,18 @@ export function Processos() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setModalEscavador(true);
+              setResultadoEscavador(null);
+              setEscavadorOabUf("");
+              setEscavadorOabNumero("");
+            }}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
+          >
+            Sincronizar Escavador
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -226,7 +271,10 @@ export function Processos() {
 
       {isError && (
         <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-destructive">
-          Erro ao carregar processos. Tente novamente.
+          <p className="font-medium">Erro ao carregar processos. Tente novamente.</p>
+          {errorMessage && (
+            <p className="mt-1 text-sm opacity-90">{errorMessage}</p>
+          )}
         </div>
       )}
 
@@ -531,6 +579,77 @@ export function Processos() {
                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {importMutation.isPending ? "Importando…" : "Importar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sincronizar Escavador */}
+      {modalEscavador && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-foreground">Sincronizar Escavador</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Busca processos por OAB no Escavador e grava em dados para integração. Configure ESCAVADOR_API_KEY no servidor.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">OAB UF</label>
+                  <input
+                    type="text"
+                    value={escavadorOabUf}
+                    onChange={(e) => setEscavadorOabUf(e.target.value)}
+                    placeholder="Ex: SP"
+                    maxLength={2}
+                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">OAB Número</label>
+                  <input
+                    type="text"
+                    value={escavadorOabNumero}
+                    onChange={(e) => setEscavadorOabNumero(e.target.value)}
+                    placeholder="Ex: 270074"
+                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              {escavadorMutation.isError && (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
+                  {escavadorMutation.error?.message ?? "Erro ao sincronizar."}
+                </div>
+              )}
+              {resultadoEscavador && resultadoEscavador.length > 0 && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+                  <p className="font-medium text-foreground">Resultado</p>
+                  <ul className="mt-2 space-y-1 text-muted-foreground">
+                    {resultadoEscavador.map((r, i) => (
+                      <li key={i}>
+                        {r.advogado}: {r.erro ? r.erro : `${r.processados} processos gravados`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setModalEscavador(false); setResultadoEscavador(null); }}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50"
+              >
+                Fechar
+              </button>
+              <button
+                type="button"
+                onClick={() => escavadorMutation.mutate()}
+                disabled={!escavadorOabUf.trim() || !escavadorOabNumero.trim() || escavadorMutation.isPending}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {escavadorMutation.isPending ? "Sincronizando…" : "Sincronizar"}
               </button>
             </div>
           </div>
