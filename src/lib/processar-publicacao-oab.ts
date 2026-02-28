@@ -21,6 +21,13 @@ import {
 
 const DIAS_UTEIS_PRAZO_INTIMACAO = 15;
 
+/** Trunca string ao máximo permitido pelo varchar; evita "value too long" no banco. */
+function v(s: string | null | undefined, max: number): string | null {
+  if (s == null || s === "") return null;
+  const t = String(s).trim();
+  return t.length > max ? t.slice(0, max) : t;
+}
+
 export function normalizarOab(oab: string | undefined): string | null {
   if (!oab || !oab.trim()) return null;
   return oab.replace(/\s*-\s*/g, "/").trim().toUpperCase();
@@ -70,34 +77,34 @@ export async function processarItemPublicacaoOab(
   const [pub] = await db
     .insert(publicacoesOab)
     .values({
-      emailId,
-      subject: item.subject ?? null,
+      emailId: (emailId || "").slice(0, 255),
+      subject: v(item.subject, 500),
       dateEmail,
-      fromEmail: item.from ?? null,
-      toEmail: item.to ?? null,
-      advogadoPrincipal: item.advogado ?? null,
-      numeroOab: item.numeroOab ?? null,
-      dataProcessamento: item.dataProcessamento ?? null,
+      fromEmail: v(item.from, 255),
+      toEmail: v(item.to, 255),
+      advogadoPrincipal: v(item.advogado, 255),
+      numeroOab: v(item.numeroOab, 50),
+      dataProcessamento: v(item.dataProcessamento, 100),
       totalPublicacoes: item.totalPublicacoes ?? null,
       publicacaoNumero,
-      dataDisponibilizacao: item.dataDisponibilizacao ?? null,
-      dataPublicacao: item.dataPublicacao ?? null,
-      jornal: item.jornal ?? null,
-      pagina: item.pagina ?? null,
-      caderno: item.caderno ?? null,
-      local: item.local ?? null,
-      vara: item.vara ?? null,
-      tipoPublicacao: item.tipoPublicacao ?? null,
-      numeroProcesso: numeroProcesso || null,
-      valorMencionado: item.valorMencionado ?? null,
+      dataDisponibilizacao: v(item.dataDisponibilizacao, 50),
+      dataPublicacao: v(item.dataPublicacao, 50),
+      jornal: v(item.jornal, 255),
+      pagina: v(item.pagina, 50),
+      caderno: v(item.caderno, 100),
+      local: v(item.local, 500),
+      vara: v(item.vara, 500),
+      tipoPublicacao: v(item.tipoPublicacao, 100),
+      numeroProcesso: v(numeroProcesso || null, 100),
+      valorMencionado: v(item.valorMencionado, 100),
       textoCompleto: item.textoCompleto ?? null,
       advogados: item.advogados ?? null,
-      poloAtivo: item.poloAtivo ?? null,
+      poloAtivo: v(item.poloAtivo, 500),
       polosPassivos: item.polosPassivos ?? null,
-      urlDocumento: item.urlDocumento ?? null,
-      identificadorDocumento: identificadorDocumento || null,
+      urlDocumento: v(item.urlDocumento, 500),
+      identificadorDocumento: v(identificadorDocumento || null, 100),
       resumo: item.resumo ?? null,
-      baseLegal: item.baseLegal ?? null,
+      baseLegal: v(item.baseLegal, 255),
       prazoDiasUteisSugerido: item.prazoDiasUteisSugerido ?? null,
       observacoesIa: item.observacoesIa ?? null,
       movimentacoes: item.movimentacoes ?? null,
@@ -150,12 +157,12 @@ export async function processarItemPublicacaoOab(
       .insert(movimentacoes)
       .values({
         publicacaoOabId: publicacaoId,
-        tipo,
+        tipo: tipo.slice(0, 100),
         resumo: resumoMov,
         ordem: ordem + 1,
         prazoDiasUteis: diasUteis > 0 ? diasUteis : null,
         dataLimite: dataLimite ?? null,
-        baseLegal: item.baseLegal ?? null,
+        baseLegal: v(item.baseLegal, 255),
       })
       .returning({ id: movimentacoes.id });
 
