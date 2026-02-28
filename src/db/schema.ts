@@ -209,6 +209,45 @@ export const movimentacoesProcesso = pgTable("movimentacoes_processo", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// --- Dados Escavador (cache por OAB: não pagar de novo; base para "Integrar dados") ---
+export const dadosEscavador = pgTable(
+  "dados_escavador",
+  {
+    id: serial("id").primaryKey(),
+    numeroCnj: varchar("numero_cnj", { length: 50 }).notNull(),
+    advogadoNome: varchar("advogado_nome", { length: 255 }),
+    advogadoOabUf: varchar("advogado_oab_uf", { length: 5 }),
+    advogadoOabNumero: varchar("advogado_oab_numero", { length: 20 }),
+    dataInicio: date("data_inicio"),
+    dataUltimaMovimentacao: date("data_ultima_movimentacao"),
+    dataUltimaVerificacao: timestamp("data_ultima_verificacao"),
+    tribunalSigla: varchar("tribunal_sigla", { length: 20 }),
+    comarca: varchar("comarca", { length: 120 }),
+    vara: varchar("vara", { length: 255 }),
+    classeProcessual: varchar("classe_processual", { length: 200 }),
+    assuntoPrincipal: varchar("assunto_principal", { length: 500 }),
+    area: varchar("area", { length: 80 }),
+    statusPredito: varchar("status_predito", { length: 30 }),
+    tituloPoloAtivo: varchar("titulo_polo_ativo", { length: 500 }),
+    tituloPoloPassivo: varchar("titulo_polo_passivo", { length: 500 }),
+    valorCausa: varchar("valor_causa", { length: 50 }),
+    quantidadeMovimentacoes: integer("quantidade_movimentacoes"),
+    segredoJustica: boolean("segredo_justica"),
+    processoPrincipalNumero: varchar("processo_principal_numero", { length: 50 }),
+    linkProcesso: varchar("link_processo", { length: 500 }),
+    payloadCompleto: jsonb("payload_completo"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("dados_escavador_numero_advogado_idx").on(
+      t.numeroCnj,
+      t.advogadoOabUf,
+      t.advogadoOabNumero
+    ),
+  ]
+);
+
 // --- Publicações OAB (Recorte Digital) ---
 export const publicacoesOab = pgTable(
   "publicacoes_oab",

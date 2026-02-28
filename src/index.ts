@@ -26,6 +26,11 @@ import {
   updateProcesso,
 } from "./routes/processos.js";
 import { importarExcelProcessos } from "./routes/processos-importar.js";
+import {
+  salvarDadosEscavador,
+  listarDadosEscavador,
+  sincronizarDadosEscavador,
+} from "./routes/dados-escavador.js";
 import { limparDados } from "./routes/admin/limpar-dados.js";
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
@@ -69,6 +74,10 @@ app.get("/api/processos/:id", requireAuth, getProcessoById);
 app.post("/api/processos", requireAuth, createProcesso);
 app.patch("/api/processos/:id", requireAuth, updateProcesso);
 app.post("/api/processos/importar-excel", requireAuth, importarExcelProcessos);
+
+app.get("/api/dados-escavador", requireAuth, listarDadosEscavador);
+app.post("/api/dados-escavador", requireAuth, salvarDadosEscavador);
+app.post("/api/dados-escavador/sincronizar", requireAuth, sincronizarDadosEscavador);
 
 app.post("/api/admin/limpar-dados", requireAuth, limparDados);
 
