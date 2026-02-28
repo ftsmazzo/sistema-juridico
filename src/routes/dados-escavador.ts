@@ -3,7 +3,7 @@ import { db } from "../db/index.js";
 import { dadosEscavador } from "../db/schema.js";
 import { asc, desc, eq, and } from "drizzle-orm";
 import type { RequestWithUser } from "../middleware/auth.js";
-import { buscarProcessosPorOab } from "../lib/escavador-sincronizar.js";
+import { buscarTodasAsPaginasProcessosPorOab } from "../lib/escavador-sincronizar.js";
 
 /** Payload que o N8N envia após o Code organizar a resposta do Escavador */
 export type DadosEscavadorPayload = {
@@ -258,7 +258,7 @@ export async function sincronizarDadosEscavador(
 
     for (const { oab_uf, oab_numero } of list) {
       try {
-        const payload = await buscarProcessosPorOab(oab_uf, oab_numero, token);
+        const payload = await buscarTodasAsPaginasProcessosPorOab(oab_uf, oab_numero, token);
         const { processados, advogadoLabel } = await gravarPayloadDadosEscavador({
           advogado: payload.advogado,
           items: payload.items,

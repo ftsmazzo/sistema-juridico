@@ -61,69 +61,43 @@ function parseDateStr(str: string | null | undefined): string | null {
   return isNaN(d.getTime()) ? null : str;
 }
 
-/**
- * Busca processos por OAB no Escavador e retorna payload normalizado.
- * Uma página por chamada (paginação pode ser feita pelo caller usando links.next).
- */
-export async function buscarProcessosPorOab(
-  oabUf: string,
-  oabNumero: string,
-  token: string
-): Promise<DadosEscavadorPayload & { _meta?: { next_page?: string } }> {
-  let tokenTrimmed = typeof token === "string" ? token.trim() : "";
-  if (!tokenTrimmed) {
-    throw new Error("Token Escavador vazio. Verifique ESCAVADOR_API_KEY ou ESCAVADOR_TOKEN.");
-  }
-  // Se colou "Bearer eyJ..." na variável, usar só o token (evita "Bearer Bearer ...")
-  if (tokenTrimmed.toLowerCase().startsWith("bearer ")) {
-    tokenTrimmed = tokenTrimmed.slice(7).trim();
-  }
-  const url = `${ESCAVADOR_BASE}/advogado/processos?oab_estado=${encodeURIComponent(oabUf)}&oab_numero=${encodeURIComponent(oabNumero)}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${tokenTrimmed}`,
-      "X-Requested-With": "XMLHttpRequest",
-    },
-  });
+function normalizeToken(token: string): string {
+  let t = typeof token === "string" ? token.trim() : "";
+  if (t.toLowerCase().startsWith("bearer ")) t = t.slice(7).trim();
+  return t;
+}
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Escavador API ${res.status}: ${text || res.statusText}`);
-  }
-
-  const raw = (await res.json()) as EscavadorResponse | EscavadorResponse[];
-  const data: EscavadorResponse = Array.isArray(raw) ? raw[0] : raw;
+function parseResponseToPayload(
+  data: EscavadorResponse,
+  oabUfFallback: string,
+  oabNumeroFallback: string
+): { advogado: DadosEscavadorPayload["advogado"]; items: DadosEscavadorPayload["items"] } {
   const advogadoEncontrado = data?.advogado_encontrado || {};
   const items = Array.isArray(data?.items) ? data.items : [];
-
-  let oabUfExtracted = oabUf;
-  let oabNumeroExtracted = oabNumero;
+  let oabUf = oabUfFallback;
+  let oabNumero = oabNumeroFallback;
   for (const item of items) {
     for (const fonte of item.fontes || []) {
       const adv = (fonte.envolvidos || []).find((e) => e.oabs?.length);
       if (adv?.oabs?.[0]) {
-        oabUfExtracted = adv.oabs[0].uf || oabUf;
-        oabNumeroExtracted = String(adv.oabs[0].numero ?? oabNumero);
+        oabUf = adv.oabs[0].uf || oabUfFallback;
+        oabNumero = String(adv.oabs[0].numero ?? oabNumeroFallback);
         break;
       }
     }
-    if (oabUfExtracted && oabNumeroExtracted) break;
+    if (oabUf && oabNumero) break;
   }
-
   const advogado = {
     nome: advogadoEncontrado.nome || "Advogado",
-    oab_uf: oabUfExtracted,
-    oab_numero: oabNumeroExtracted,
+    oab_uf: oabUf,
+    oab_numero: oabNumero,
   };
-
   const organizedItems = items.map((item) => {
     const fonte = getFonteTribunal(item);
     const capa = fonte?.capa || {};
     const valorCausa = capa.valor_causa;
     const unidade = item.unidade_origem || {};
     const processoPrincipal = (item.processos_relacionados || [])[0];
-
     let linkProcesso: string | null = null;
     for (const f of item.fontes || []) {
       if (f.url) {
@@ -131,9 +105,7 @@ export async function buscarProcessosPorOab(
         break;
       }
     }
-
     const jurisdição = capa.informacoes_complementares?.find((i) => i.tipo === "Jurisdição")?.valor;
-
     return {
       numero_cnj: item.numero_cnj || "",
       data_inicio: parseDateStr(item.data_inicio),
@@ -156,12 +128,84 @@ export async function buscarProcessosPorOab(
       payload_completo: item,
     };
   });
+  return { advogado, items: organizedItems };
+}
 
+/**
+ * Busca processos por OAB no Escavador e retorna payload normalizado.
+ * Uma página por chamada (paginação pode ser feita pelo caller usando links.next).
+ */
+export async function buscarProcessosPorOab(
+  oabUf: string,
+  oabNumero: string,
+  token: string
+): Promise<DadosEscavadorPayload & { _meta?: { next_page?: string } }> {
+  const tokenTrimmed = normalizeToken(token);
+  if (!tokenTrimmed) {
+    throw new Error("Token Escavador vazio. Verifique ESCAVADOR_API_KEY ou ESCAVADOR_TOKEN.");
+  }
+  const url = `${ESCAVADOR_BASE}/advogado/processos?oab_estado=${encodeURIComponent(oabUf)}&oab_numero=${encodeURIComponent(oabNumero)}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${tokenTrimmed}`,
+      "X-Requested-With": "XMLHttpRequest",
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Escavador API ${res.status}: ${text || res.statusText}`);
+  }
+  const raw = (await res.json()) as EscavadorResponse | EscavadorResponse[];
+  const data: EscavadorResponse = Array.isArray(raw) ? raw[0] : raw;
+  const { advogado, items } = parseResponseToPayload(data, oabUf, oabNumero);
   return {
     advogado,
-    items: organizedItems,
-    _meta: {
-      next_page: data?.links?.next || undefined,
-    },
+    items,
+    _meta: { next_page: data?.links?.next || undefined },
   };
+}
+
+/**
+ * Busca todas as páginas de processos por OAB e retorna um único payload com todos os itens.
+ * A API Escavador retorna em geral 20 itens por página (links.next para a próxima).
+ */
+export async function buscarTodasAsPaginasProcessosPorOab(
+  oabUf: string,
+  oabNumero: string,
+  token: string
+): Promise<DadosEscavadorPayload> {
+  const tokenTrimmed = normalizeToken(token);
+  if (!tokenTrimmed) {
+    throw new Error("Token Escavador vazio. Verifique ESCAVADOR_API_KEY ou ESCAVADOR_TOKEN.");
+  }
+  const headers = {
+    Authorization: `Bearer ${tokenTrimmed}`,
+    "X-Requested-With": "XMLHttpRequest",
+  };
+
+  const firstUrl = `${ESCAVADOR_BASE}/advogado/processos?oab_estado=${encodeURIComponent(oabUf)}&oab_numero=${encodeURIComponent(oabNumero)}`;
+  let nextUrl: string | null = firstUrl;
+  let advogado: DadosEscavadorPayload["advogado"] = {
+    nome: "Advogado",
+    oab_uf: oabUf,
+    oab_numero: oabNumero,
+  };
+  const allItems: DadosEscavadorPayload["items"] = [];
+
+  while (nextUrl) {
+    const res = await fetch(nextUrl, { method: "GET", headers });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Escavador API ${res.status}: ${text || res.statusText}`);
+    }
+    const raw = (await res.json()) as EscavadorResponse | EscavadorResponse[];
+    const data: EscavadorResponse = Array.isArray(raw) ? raw[0] : raw;
+    const parsed = parseResponseToPayload(data, oabUf, oabNumero);
+    if (allItems.length === 0) advogado = parsed.advogado;
+    allItems.push(...parsed.items);
+    nextUrl = data?.links?.next || null;
+  }
+
+  return { advogado, items: allItems };
 }
