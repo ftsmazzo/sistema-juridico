@@ -35,16 +35,19 @@ export type DadosEscavadorPayload = {
   }>;
 };
 
-function parseDate(s: string | null | undefined): Date | null {
+/** Converte para string YYYY-MM-DD (schema usa date = string) ou null */
+function parseDateString(s: string | null | undefined): string | null {
   if (!s || typeof s !== "string") return null;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
 }
 
-function parseTimestamp(s: string | null | undefined): Date | null {
+/** Converte para string ISO (schema timestamp aceita string) ou null */
+function parseTimestampString(s: string | null | undefined): string | null {
   if (!s || typeof s !== "string") return null;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 /** Grava payload no banco (upsert). Usado por POST /dados-escavador e por /dados-escavador/sincronizar. */
@@ -58,9 +61,9 @@ export async function gravarPayloadDadosEscavador(
   for (const item of items) {
     if (!item?.numero_cnj) continue;
 
-    const dataInicio = parseDate(item.data_inicio);
-    const dataUltimaMov = parseDate(item.data_ultima_movimentacao);
-    const dataUltimaVerif = parseTimestamp(item.data_ultima_verificacao);
+    const dataInicio = parseDateString(item.data_inicio);
+    const dataUltimaMov = parseDateString(item.data_ultima_movimentacao);
+    const dataUltimaVerif = parseTimestampString(item.data_ultima_verificacao);
 
     const row = {
       numeroCnj: item.numero_cnj,
@@ -90,10 +93,7 @@ export async function gravarPayloadDadosEscavador(
 
     await db
       .insert(dadosEscavador)
-      .values({
-        ...row,
-        updatedAt: new Date(),
-      })
+      .values(row)
       .onConflictDoUpdate({
         target: [
           dadosEscavador.numeroCnj,
@@ -101,9 +101,9 @@ export async function gravarPayloadDadosEscavador(
           dadosEscavador.advogadoOabNumero,
         ],
         set: {
-          dataInicio: row.dataInicio,
-          dataUltimaMovimentacao: row.dataUltimaMovimentacao,
-          dataUltimaVerificacao: row.dataUltimaVerificacao,
+          dataInicio: row.dataInicio ?? null,
+          dataUltimaMovimentacao: row.dataUltimaMovimentacao ?? null,
+          dataUltimaVerificacao: row.dataUltimaVerificacao ?? null,
           tribunalSigla: row.tribunalSigla,
           comarca: row.comarca,
           vara: row.vara,
@@ -200,9 +200,11 @@ export async function listarDadosEscavador(
 }
 
 /** Body: { oab_uf, oab_numero } para um advogado ou { advogados: [ { oab_uf, oab_numero } ] } para vários */
-type SincronizarBody =
-  | { oab_uf: string; oab_numero: string }
-  | { advogados: Array<{ oab_uf: string; oab_numero: string }> };
+type SincronizarBody = {
+  oab_uf?: string;
+  oab_numero?: string;
+  advogados?: Array<{ oab_uf?: string; oab_numero?: string }>;
+};
 
 /** POST: chama Escavador, normaliza e grava em dados_escavador (1 página por OAB). Não precisa do N8N. */
 export async function sincronizarDadosEscavador(
@@ -228,9 +230,12 @@ export async function sincronizarDadosEscavador(
     let list: Array<{ oab_uf: string; oab_numero: string }>;
 
     if (body?.advogados && Array.isArray(body.advogados)) {
-      list = body.advogados.filter(
-        (a) => a?.oab_uf?.trim() && a?.oab_numero?.trim()
-      );
+      list = body.advogados
+        .filter(
+          (a): a is { oab_uf: string; oab_numero: string } =>
+            Boolean(a?.oab_uf?.trim() && a?.oab_numero?.trim())
+        )
+        .map((a) => ({ oab_uf: a.oab_uf.trim(), oab_numero: String(a.oab_numero).trim() }));
     } else if (body?.oab_uf?.trim() && body?.oab_numero?.trim()) {
       list = [{ oab_uf: body.oab_uf.trim(), oab_numero: String(body.oab_numero).trim() }];
     } else {
