@@ -232,6 +232,27 @@ export function cadastrarPublicacaoPorPrint(
   });
 }
 
+/** Teste do pipeline de e-mail Recorte: cola o corpo do e-mail → extrai + IA + grava */
+export type EmailMonitorTestResponse = {
+  ok: boolean;
+  publicacoesExtraidas: number;
+  publicacoesGravadas: number;
+  prazosCriados: number;
+  publicacaoIds: number[];
+  prazoIds: number[];
+  erros?: string[];
+};
+
+export function testarEmailMonitor(body: {
+  emailText?: string;
+  emailHtml?: string;
+  subject?: string;
+  from?: string;
+  to?: string;
+}) {
+  return api.post<EmailMonitorTestResponse>("/api/email-monitor/test", body);
+}
+
 /** Lista prazos com filtros: inicio, fim (YYYY-MM-DD), status (0=pendente), tipo */
 export function getPrazos(params: {
   inicio?: string;

@@ -19,7 +19,18 @@ Validar se, ao trazer a extração do e-mail para o backend (em vez do N8N), **a
 
 ## Como testar
 
-### Endpoint
+### Pelo sistema (recomendado)
+
+1. Acesse **Publicações** no menu.
+2. Clique em **Testar e-mail Recorte** (botão ao lado de "Nova publicação").
+3. **Cole o corpo do e-mail** no campo de texto (copie do seu cliente de e-mail ou do N8N).
+4. Opcional: preencha Assunto, De, Para (ajudam na deduplicação).
+5. Clique em **Processar e-mail**.
+6. Veja o resultado (quantas publicações extraídas/gravadas, prazos) e o link para ver a publicação.
+
+Nada de N8N nem Postman: tudo na própria tela.
+
+### Endpoint (alternativa)
 
 **POST** `/api/email-monitor/test`  
 **Autenticação:** Bearer (login normal do sistema).  

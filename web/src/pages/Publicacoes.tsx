@@ -29,12 +29,20 @@ export function Publicacoes() {
             Publicações OAB (Recorte Digital) recebidas e processadas.
           </p>
         </div>
-        <Link
-          to="/publicacoes/nova"
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          Nova publicação
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/publicacoes/testar-email"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
+          >
+            Testar e-mail Recorte
+          </Link>
+          <Link
+            to="/publicacoes/nova"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Nova publicação
+          </Link>
+        </div>
       </div>
 
       {isError && (

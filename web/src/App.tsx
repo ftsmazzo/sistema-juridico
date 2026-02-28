@@ -6,6 +6,7 @@ import { Prazos } from "@/pages/Prazos";
 import { Publicacoes } from "@/pages/Publicacoes";
 import { DetalhePublicacao } from "@/pages/DetalhePublicacao";
 import { NovaPublicacao } from "@/pages/NovaPublicacao";
+import { TestarEmailRecorte } from "@/pages/TestarEmailRecorte";
 import { Processos } from "@/pages/Processos";
 import { DetalheProcesso } from "@/pages/DetalheProcesso";
 import { Pessoas } from "@/pages/Pessoas";
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="prazos" element={<Prazos />} />
           <Route path="publicacoes" element={<Publicacoes />} />
           <Route path="publicacoes/nova" element={<NovaPublicacao />} />
+          <Route path="publicacoes/testar-email" element={<TestarEmailRecorte />} />
           <Route path="publicacoes/:id" element={<DetalhePublicacao />} />
           <Route path="processos" element={<Processos />} />
           <Route path="processos/:id" element={<DetalheProcesso />} />
