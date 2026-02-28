@@ -36,7 +36,7 @@ const LABEL_SEM_MOV: Record<string, string> = {
 
 export function Processos() {
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const semMovimentacaoUrl = searchParams.get("semMovimentacao") ?? "";
   const semMovimentacao =
     semMovimentacaoUrl && ["sem-info", "30", "60", "90", "120-mais"].includes(semMovimentacaoUrl)
