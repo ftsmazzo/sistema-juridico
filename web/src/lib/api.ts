@@ -446,7 +446,20 @@ export function importarExcelProcessos(
   });
 }
 
-// --- Dados Escavador (sincronizar por OAB) ---
+// --- Dados Escavador (sincronizar por OAB e listar gravados) ---
+export type DadosEscavadorListItem = {
+  id: number;
+  numeroCnj: string;
+  advogadoNome: string | null;
+  advogadoOabUf: string | null;
+  advogadoOabNumero: string | null;
+  dataInicio: string | null;
+  dataUltimaMovimentacao: string | null;
+  comarca: string | null;
+  vara: string | null;
+  createdAt: string;
+};
+
 export type SincronizarEscavadorResultado = {
   oab_uf: string;
   oab_numero: string;
@@ -455,6 +468,14 @@ export type SincronizarEscavadorResultado = {
   advogado: string;
   erro?: string;
 };
+
+export function getDadosEscavador(params?: { oab_uf?: string; oab_numero?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.oab_uf) sp.set("oab_uf", params.oab_uf);
+  if (params?.oab_numero) sp.set("oab_numero", params.oab_numero);
+  const q = sp.toString();
+  return api.get<DadosEscavadorListItem[]>(`/api/dados-escavador${q ? `?${q}` : ""}`);
+}
 
 export function sincronizarDadosEscavador(body: { oab_uf: string; oab_numero: string } | { advogados: Array<{ oab_uf: string; oab_numero: string }> }) {
   return api.post<{ ok: boolean; resultados: SincronizarEscavadorResultado[] }>(

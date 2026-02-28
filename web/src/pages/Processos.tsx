@@ -9,6 +9,7 @@ import {
   createProcesso,
   updateProcesso,
   importarExcelProcessos,
+  getDadosEscavador,
   sincronizarDadosEscavador,
   type ProcessoListItem,
   type ResultadoImportacao,
@@ -37,6 +38,9 @@ export function Processos() {
   const [escavadorOabUf, setEscavadorOabUf] = useState("");
   const [escavadorOabNumero, setEscavadorOabNumero] = useState("");
   const [resultadoEscavador, setResultadoEscavador] = useState<SincronizarEscavadorResultado[] | null>(null);
+  const [mostrarDadosEscavador, setMostrarDadosEscavador] = useState(false);
+  const [filtroEscavadorUf, setFiltroEscavadorUf] = useState("");
+  const [filtroEscavadorNum, setFiltroEscavadorNum] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [opcoesImport, setOpcoesImport] = useState({
@@ -135,10 +139,21 @@ export function Processos() {
       }),
     onSuccess: (data) => {
       setResultadoEscavador(data.resultados ?? null);
+      queryClient.invalidateQueries({ queryKey: ["dados-escavador"] });
     },
     onError: () => {
       setResultadoEscavador(null);
     },
+  });
+
+  const { data: dadosEscavadorList = [], isPending: dadosEscavadorPending } = useQuery({
+    queryKey: ["dados-escavador", filtroEscavadorUf, filtroEscavadorNum],
+    queryFn: () =>
+      getDadosEscavador({
+        oab_uf: filtroEscavadorUf.trim() || undefined,
+        oab_numero: filtroEscavadorNum.trim() || undefined,
+      }),
+    enabled: mostrarDadosEscavador,
   });
 
   function openNew() {
@@ -191,6 +206,13 @@ export function Processos() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setMostrarDadosEscavador((v) => !v)}
+            className={`inline-flex shrink-0 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${mostrarDadosEscavador ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-foreground hover:bg-muted/50"}`}
+          >
+            {mostrarDadosEscavador ? "Ocultar dados Escavador" : "Ver dados gravados (Escavador)"}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -268,6 +290,71 @@ export function Processos() {
           ))}
         </select>
       </div>
+
+      {/* Dados gravados Escavador (cache) */}
+      {mostrarDadosEscavador && (
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground">Dados gravados (Escavador)</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Processos já buscados e salvos (cache). Filtre por OAB para confirmar a sincronização.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              placeholder="OAB UF (ex: SP)"
+              value={filtroEscavadorUf}
+              onChange={(e) => setFiltroEscavadorUf(e.target.value)}
+              className="w-24 rounded-md border border-border bg-background px-3 py-2 text-sm uppercase"
+            />
+            <input
+              type="text"
+              placeholder="OAB Número"
+              value={filtroEscavadorNum}
+              onChange={(e) => setFiltroEscavadorNum(e.target.value)}
+              className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          {dadosEscavadorPending ? (
+            <div className="mt-4 py-8 text-center text-muted-foreground">Carregando…</div>
+          ) : dadosEscavadorList.length === 0 ? (
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+              Nenhum registro. Use <strong>Sincronizar Escavador</strong> para buscar por OAB.
+            </div>
+          ) : (
+            <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="px-3 py-2 font-medium text-foreground">Nº CNJ</th>
+                    <th className="px-3 py-2 font-medium text-foreground">Advogado</th>
+                    <th className="px-3 py-2 font-medium text-foreground">OAB</th>
+                    <th className="hidden px-3 py-2 font-medium text-foreground md:table-cell">Comarca / Vara</th>
+                    <th className="px-3 py-2 font-medium text-foreground">Últ. mov.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dadosEscavadorList.map((r) => (
+                    <tr key={r.id} className="border-b border-border/60 hover:bg-muted/20">
+                      <td className="px-3 py-2 font-medium text-foreground">{r.numeroCnj}</td>
+                      <td className="px-3 py-2 text-foreground">{r.advogadoNome ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {[r.advogadoOabUf, r.advogadoOabNumero].filter(Boolean).join(" ") || "—"}
+                      </td>
+                      <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">
+                        {[r.comarca, r.vara].filter(Boolean).join(" / ") || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{formatarData(r.dataUltimaMovimentacao)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="border-t border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                Total: {dadosEscavadorList.length} registro(s)
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {isError && (
         <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 text-destructive">
