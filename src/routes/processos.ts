@@ -25,11 +25,17 @@ export type ProcessoListItem = {
   vara: string | null;
   dataPrazo: string | null;
   dataInicio: string | null;
+  dataUltimaMovimentacao: string | null;
 };
+
+const PER_PAGE = 20;
 
 export async function listProcessos(
   req: RequestWithUser,
-  res: Response<ProcessoListItem[] | { error: string }>
+  res: Response<
+    | { items: ProcessoListItem[]; total: number; page: number; perPage: number }
+    | { error: string }
+  >
 ): Promise<void> {
   try {
     if (!req.user) {
@@ -40,6 +46,7 @@ export async function listProcessos(
     const status = req.query.status as string | undefined;
     const idCliente = req.query.idCliente as string | undefined;
     const idAdvogado = req.query.idAdvogado as string | undefined;
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
     const conditions = [];
     if (q) {
       conditions.push(
@@ -60,6 +67,13 @@ export async function listProcessos(
     if (idAdvogado && Number.isInteger(Number(idAdvogado))) {
       conditions.push(eq(processos.idAdvogadoResponsavel, Number(idAdvogado)));
     }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(processos)
+      .where(whereClause);
+
     const list = await db
       .select({
         id: processos.id,
@@ -74,17 +88,27 @@ export async function listProcessos(
         vara: processos.vara,
         dataPrazo: processos.dataPrazo,
         dataInicio: processos.dataInicio,
+        dataUltimaMovimentacao: processos.dataUltimaMovimentacao,
       })
       .from(processos)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(processos.dataInicio), asc(processos.numeroCnj));
-    res.json(
-      list.map((p) => ({
+      .where(whereClause)
+      .orderBy(desc(processos.dataInicio), asc(processos.numeroCnj))
+      .limit(PER_PAGE)
+      .offset((page - 1) * PER_PAGE);
+
+    res.json({
+      items: list.map((p) => ({
         ...p,
         dataPrazo: p.dataPrazo ? String(p.dataPrazo) : null,
         dataInicio: p.dataInicio ? String(p.dataInicio) : null,
-      }))
-    );
+        dataUltimaMovimentacao: p.dataUltimaMovimentacao
+          ? String(p.dataUltimaMovimentacao)
+          : null,
+      })),
+      total,
+      page,
+      perPage: PER_PAGE,
+    });
   } catch (err) {
     console.error("List processos:", err);
     res.status(500).json({ error: "Erro ao listar processos" });
@@ -285,5 +309,39 @@ export async function updateProcesso(
   } catch (err) {
     console.error("Update processo:", err);
     res.status(500).json({ error: "Erro ao atualizar processo" });
+  }
+}
+
+/** POST: atualiza processos com data_ultima_movimentacao a partir de dados_escavador (por numero_cnj). */
+export async function enriquecerProcessosComEscavador(
+  req: RequestWithUser,
+  res: Response<{ updated: number; message: string } | { error: string }>
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+    const result = await db.execute(sql`
+      UPDATE processos p
+      SET data_ultima_movimentacao = sub.max_mov
+      FROM (
+        SELECT numero_cnj, MAX(data_ultima_movimentacao) AS max_mov
+        FROM dados_escavador
+        WHERE data_ultima_movimentacao IS NOT NULL
+        GROUP BY numero_cnj
+      ) sub
+      WHERE p.numero_cnj = sub.numero_cnj
+    `);
+    const updated = typeof (result as { rowCount?: number }).rowCount === "number"
+      ? (result as { rowCount: number }).rowCount
+      : 0;
+    res.json({
+      updated,
+      message: `${updated} processo(s) atualizado(s) com última movimentação do Escavador.`,
+    });
+  } catch (err) {
+    console.error("Enriquecer processos com Escavador:", err);
+    res.status(500).json({ error: "Erro ao enriquecer processos com dados do Escavador." });
   }
 }

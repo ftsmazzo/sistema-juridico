@@ -392,6 +392,14 @@ export type ProcessoListItem = {
   vara: string | null;
   dataPrazo: string | null;
   dataInicio: string | null;
+  dataUltimaMovimentacao: string | null;
+};
+
+export type ProcessoListResponse = {
+  items: ProcessoListItem[];
+  total: number;
+  page: number;
+  perPage: number;
 };
 
 export type ProcessoDetalhe = ProcessoListItem & {
@@ -405,14 +413,25 @@ export type ProcessoDetalhe = ProcessoListItem & {
   [key: string]: unknown;
 };
 
-export function getProcessos(params?: { q?: string; status?: string; idCliente?: number; idAdvogado?: number }) {
+export function getProcessos(params?: {
+  q?: string;
+  status?: string;
+  idCliente?: number;
+  idAdvogado?: number;
+  page?: number;
+}) {
   const sp = new URLSearchParams();
   if (params?.q) sp.set("q", params.q);
   if (params?.status) sp.set("status", params.status);
   if (params?.idCliente != null) sp.set("idCliente", String(params.idCliente));
   if (params?.idAdvogado != null) sp.set("idAdvogado", String(params.idAdvogado));
+  if (params?.page != null && params.page >= 1) sp.set("page", String(params.page));
   const q = sp.toString();
-  return api.get<ProcessoListItem[]>(`/api/processos${q ? `?${q}` : ""}`);
+  return api.get<ProcessoListResponse>(`/api/processos${q ? `?${q}` : ""}`);
+}
+
+export function enriquecerProcessosEscavador() {
+  return api.post<{ updated: number; message: string }>("/api/processos/enriquecer-escavador");
 }
 
 export function getProcesso(id: number) {

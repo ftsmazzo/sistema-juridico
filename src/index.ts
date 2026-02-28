@@ -24,6 +24,7 @@ import {
   getProcessoById,
   createProcesso,
   updateProcesso,
+  enriquecerProcessosComEscavador,
 } from "./routes/processos.js";
 import { importarExcelProcessos } from "./routes/processos-importar.js";
 import {
@@ -70,6 +71,7 @@ app.post("/api/clientes", requireAuth, createCliente);
 app.patch("/api/clientes/:id", requireAuth, updateCliente);
 
 app.get("/api/processos", requireAuth, listProcessos);
+app.post("/api/processos/enriquecer-escavador", requireAuth, enriquecerProcessosComEscavador);
 app.get("/api/processos/:id", requireAuth, getProcessoById);
 app.post("/api/processos", requireAuth, createProcesso);
 app.patch("/api/processos/:id", requireAuth, updateProcesso);

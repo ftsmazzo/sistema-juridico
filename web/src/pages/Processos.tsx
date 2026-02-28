@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,6 +11,7 @@ import {
   importarExcelProcessos,
   getDadosEscavador,
   sincronizarDadosEscavador,
+  enriquecerProcessosEscavador,
   type ProcessoListItem,
   type ResultadoImportacao,
   type SincronizarEscavadorResultado,
@@ -41,6 +42,7 @@ export function Processos() {
   const [mostrarDadosEscavador, setMostrarDadosEscavador] = useState(false);
   const [filtroEscavadorUf, setFiltroEscavadorUf] = useState("");
   const [filtroEscavadorNum, setFiltroEscavadorNum] = useState("");
+  const [page, setPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [opcoesImport, setOpcoesImport] = useState({
@@ -50,16 +52,25 @@ export function Processos() {
   });
   const [resultadoImport, setResultadoImport] = useState<ResultadoImportacao | null>(null);
 
-  const { data: list = [], isPending, isError, error } = useQuery({
-    queryKey: ["processos", q, status, idCliente, idAdvogado],
+  const { data: listData, isPending, isError, error } = useQuery({
+    queryKey: ["processos", q, status, idCliente, idAdvogado, page],
     queryFn: () =>
       getProcessos({
         q: q || undefined,
         status: status || undefined,
         idCliente: idCliente ? Number(idCliente) : undefined,
         idAdvogado: idAdvogado ? Number(idAdvogado) : undefined,
+        page,
       }),
   });
+  const list = listData?.items ?? [];
+  const totalProcessos = listData?.total ?? 0;
+  const perPage = listData?.perPage ?? 20;
+  const totalPages = Math.max(1, Math.ceil(totalProcessos / perPage));
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, status, idCliente, idAdvogado]);
 
   /** Mensagem de erro amigável (API pode retornar JSON { error: "..." }) */
   const errorMessage = (() => {
@@ -106,6 +117,13 @@ export function Processos() {
       queryClient.invalidateQueries({ queryKey: ["processos"] });
       setModalProcesso(false);
       setEditing(null);
+    },
+  });
+
+  const enriquecerMutation = useMutation({
+    mutationFn: enriquecerProcessosEscavador,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["processos"] });
     },
   });
 
@@ -224,6 +242,15 @@ export function Processos() {
             className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
           >
             Sincronizar Escavador
+          </button>
+          <button
+            type="button"
+            disabled={enriquecerMutation.isPending}
+            onClick={() => enriquecerMutation.mutate()}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
+            title="Atualiza a coluna Última movimentação dos processos com dados já gravados do Escavador"
+          >
+            {enriquecerMutation.isPending ? "Enriquecendo…" : "Enriquecer com Escavador"}
           </button>
           <button
             type="button"
@@ -397,8 +424,7 @@ export function Processos() {
                   <th className="px-4 py-3 font-medium text-foreground">Cliente</th>
                   <th className="hidden px-4 py-3 font-medium text-foreground lg:table-cell">Advogado</th>
                   <th className="hidden px-4 py-3 font-medium text-foreground lg:table-cell">Comarca / Vara</th>
-                  <th className="px-4 py-3 font-medium text-foreground">Data prazo</th>
-                  <th className="px-4 py-3 font-medium text-foreground">Data início</th>
+                  <th className="px-4 py-3 font-medium text-foreground">Última mov.</th>
                   <th className="px-4 py-3 font-medium text-foreground">Ações</th>
                 </tr>
               </thead>
@@ -441,8 +467,9 @@ export function Processos() {
                     <td className="hidden px-4 py-3 lg:table-cell text-muted-foreground">
                       {[p.comarca, p.vara].filter(Boolean).join(" / ") || "—"}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatarData(p.dataPrazo)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{formatarData(p.dataInicio)}</td>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {formatarData(p.dataUltimaMovimentacao)}
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
@@ -456,6 +483,34 @@ export function Processos() {
                 ))}
               </tbody>
             </table>
+            {totalProcessos > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border bg-muted/20 px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  Mostrando {(page - 1) * perPage + 1} a {Math.min(page * perPage, totalProcessos)} de {totalProcessos} processo(s)
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <span className="px-2 text-sm text-muted-foreground">
+                    Página {page} de {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

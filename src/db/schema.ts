@@ -185,6 +185,7 @@ export const processos = pgTable(
     vara: varchar("vara", { length: 120 }),
     observacoes: text("observacoes"),
     dataInicio: date("data_inicio"),
+    dataUltimaMovimentacao: date("data_ultima_movimentacao"),
     dataFim: date("data_fim"),
     duracaoTexto: varchar("duracao_texto", { length: 50 }),
     resultado: varchar("resultado", { length: 80 }),
