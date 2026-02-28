@@ -3,9 +3,10 @@ import { db } from "../db/index.js";
 import {
   publicacoesOab,
   prazos,
+  processos,
   analiseIaPublicacao,
 } from "../db/schema.js";
-import { count, eq, gte, desc, and, isNotNull, sql, inArray } from "drizzle-orm";
+import { count, eq, gte, desc, and, isNotNull, inArray } from "drizzle-orm";
 
 export type DashboardTotais = {
   publicacoes: number;
@@ -60,10 +61,10 @@ export async function getDashboard(
       .from(prazos)
       .where(eq(prazos.status, 0));
 
-    const processosResult = await db.execute<{ c: string }>(
-      sql`SELECT COUNT(DISTINCT numero_processo)::text as c FROM prazos WHERE numero_processo IS NOT NULL`
-    );
-    const processos = parseInt(processosResult.rows[0]?.c ?? "0", 10);
+    const [totaisProcessos] = await db
+      .select({ count: count() })
+      .from(processos);
+    const processosCount = totaisProcessos?.count ?? 0;
 
     const proximos = await db
       .select({
@@ -112,7 +113,7 @@ export async function getDashboard(
       publicacoes: totaisPub?.count ?? 0,
       prazos: totaisPrazos?.count ?? 0,
       prazosPendentes: totaisPendentes?.count ?? 0,
-      processos,
+      processos: processosCount,
     };
 
     const sugestoesIa: SugestaoIa[] = sugestoes.map((s) => ({
