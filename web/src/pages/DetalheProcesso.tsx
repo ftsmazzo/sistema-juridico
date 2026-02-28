@@ -411,6 +411,19 @@ export function DetalheProcesso() {
       {aba === "movimentacoes" && (
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="mb-4 font-semibold text-foreground">Histórico de movimentações</h3>
+          {(p.dataUltimaMovimentacao != null && String(p.dataUltimaMovimentacao).trim() !== "") && (
+            <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Última movimentação (Escavador)
+              </p>
+              <p className="mt-0.5 text-sm font-medium text-foreground">
+                {formatarData(String(p.dataUltimaMovimentacao))}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Data atualizada a partir dos dados sincronizados do Escavador para este processo.
+              </p>
+            </div>
+          )}
           {movimentacoes.length === 0 ? (
             <p className="text-muted-foreground">Nenhuma movimentação registrada.</p>
           ) : (
