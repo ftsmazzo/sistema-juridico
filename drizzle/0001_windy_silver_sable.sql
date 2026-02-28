@@ -73,8 +73,8 @@ CREATE TABLE IF NOT EXISTS "processos" (
 	CONSTRAINT "processos_numero_cnj_unique" UNIQUE("numero_cnj")
 );
 --> statement-breakpoint
-ALTER TABLE "prazos" ADD COLUMN "processo_id" integer;--> statement-breakpoint
-ALTER TABLE "publicacoes_oab" ADD COLUMN "processo_id" integer;--> statement-breakpoint
+ALTER TABLE "prazos" ADD COLUMN IF NOT EXISTS "processo_id" integer;--> statement-breakpoint
+ALTER TABLE "publicacoes_oab" ADD COLUMN IF NOT EXISTS "processo_id" integer;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "movimentacoes_processo" ADD CONSTRAINT "movimentacoes_processo_id_processo_processos_id_fk" FOREIGN KEY ("id_processo") REFERENCES "public"."processos"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
