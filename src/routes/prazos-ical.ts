@@ -1,0 +1,140 @@
+/**
+ * GET /api/prazos/export.ics — exporta os prazos do usuário logado em .ics (download).
+ * GET /api/prazos/feed.ics?token=XXX — feed de inscrição (sem auth; token identifica o usuário).
+ * GET /api/prazos/link-inscricao — retorna a URL de inscrição do usuário (gera token se não existir).
+ */
+import { Response } from "express";
+import type { RequestWithUser } from "../middleware/auth.js";
+import { db } from "../db/index.js";
+import { prazos, prazosUsuarios, usuarios } from "../db/schema.js";
+import { eq, and, gte, lte } from "drizzle-orm";
+import { buildIcsFromPrazos, type PrazoParaIcs } from "../lib/ical-prazos.js";
+import crypto from "crypto";
+
+async function getPrazosDoUsuario(
+  userId: number,
+  inicio?: string,
+  fim?: string
+): Promise<PrazoParaIcs[]> {
+  const conditions = [eq(prazosUsuarios.idUsuario, userId)];
+  if (inicio) conditions.push(gte(prazos.data, inicio));
+  if (fim) conditions.push(lte(prazos.data, fim));
+
+  const rows = await db
+    .select({
+      id: prazos.id,
+      data: prazos.data,
+      prazo: prazos.prazo,
+      tipo: prazos.tipo,
+      numeroProcesso: prazos.numeroProcesso,
+      observacao: prazos.observacao,
+    })
+    .from(prazos)
+    .innerJoin(prazosUsuarios, eq(prazosUsuarios.idPrazo, prazos.id))
+    .where(and(...conditions))
+    .orderBy(prazos.data, prazos.prazo);
+
+  return rows.map((r) => ({
+    id: r.id,
+    data: String(r.data),
+    prazo: r.prazo,
+    tipo: r.tipo,
+    numeroProcesso: r.numeroProcesso,
+    observacao: r.observacao,
+  }));
+}
+
+/** GET /api/prazos/export.ics — download .ics dos prazos do usuário (autenticado). */
+export async function getExportIcs(
+  req: RequestWithUser,
+  res: Response<string | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  const inicio = (req.query.inicio as string)?.trim().slice(0, 10);
+  const fim = (req.query.fim as string)?.trim().slice(0, 10);
+
+  try {
+    const lista = await getPrazosDoUsuario(req.user.id, inicio || undefined, fim || undefined);
+    const ics = buildIcsFromPrazos(lista);
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="prazos.ics"');
+    res.send(ics);
+  } catch (err) {
+    console.error("Export .ics:", err);
+    res.status(500).json({ error: "Erro ao gerar .ics" });
+  }
+}
+
+/** GET /api/prazos/feed.ics?token=XXX — feed para inscrição na agenda (público com token). */
+export async function getFeedIcs(
+  req: RequestWithUser,
+  res: Response<string | { error: string }>
+): Promise<void> {
+  const token = (req.query.token as string)?.trim();
+  if (!token) {
+    res.status(400).json({ error: "Token obrigatório" });
+    return;
+  }
+
+  const [u] = await db
+    .select({ id: usuarios.id })
+    .from(usuarios)
+    .where(eq(usuarios.calendarFeedToken, token))
+    .limit(1);
+  if (!u) {
+    res.status(404).json({ error: "Link inválido ou revogado" });
+    return;
+  }
+
+  try {
+    const lista = await getPrazosDoUsuario(u.id);
+    const ics = buildIcsFromPrazos(lista, "Prazos - Agenda Prazos");
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Cache-Control", "private, max-age=300"); // 5 min
+    res.send(ics);
+  } catch (err) {
+    console.error("Feed .ics:", err);
+    res.status(500).json({ error: "Erro ao gerar feed" });
+  }
+}
+
+function generateFeedToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+/** GET /api/prazos/link-inscricao — retorna a URL de inscrição; gera token se não existir. */
+export async function getLinkInscricao(
+  req: RequestWithUser,
+  res: Response<{ url: string } | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+
+  const [u] = await db
+    .select({ calendarFeedToken: usuarios.calendarFeedToken })
+    .from(usuarios)
+    .where(eq(usuarios.id, req.user.id))
+    .limit(1);
+  if (!u) {
+    res.status(404).json({ error: "Usuário não encontrado" });
+    return;
+  }
+
+  let token = u.calendarFeedToken?.trim();
+  if (!token) {
+    token = generateFeedToken();
+    await db
+      .update(usuarios)
+      .set({ calendarFeedToken: token, updatedAt: new Date() })
+      .where(eq(usuarios.id, req.user.id));
+  }
+
+  const baseUrl = process.env.PUBLIC_URL || req.protocol + "://" + req.get("host") || "";
+  const url = `${baseUrl.replace(/\/$/, "")}/api/prazos/feed.ics?token=${token}`;
+  res.json({ url });
+}

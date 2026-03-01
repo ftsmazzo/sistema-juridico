@@ -339,6 +339,35 @@ export function getPrazos(params: {
   return api.get<PrazoListItem[]>(`/api/prazos${q ? `?${q}` : ""}`);
 }
 
+/** Retorna a URL de inscrição do calendário (meus prazos); gera token se não existir. */
+export function getLinkInscricaoCalendario() {
+  return api.get<{ url: string }>("/api/prazos/link-inscricao");
+}
+
+/**
+ * Faz o download do arquivo .ics com os prazos do usuário (requer login).
+ * Params opcionais: inicio, fim (YYYY-MM-DD) para filtrar pelo mês.
+ */
+export async function downloadPrazosIcs(params?: { inicio?: string; fim?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.inicio) sp.set("inicio", params.inicio);
+  if (params?.fim) sp.set("fim", params.fim);
+  const q = sp.toString();
+  const path = `/api/prazos/export.ics${q ? `?${q}` : ""}`;
+  const url = path.startsWith("http") ? path : `${api.baseUrl}${path}`;
+  const token = getToken();
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "prazos.ics";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 // --- Auth ---
 export type LoginResponse = {
   token: string;

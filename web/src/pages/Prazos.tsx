@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getPrazos, type PrazoListItem } from "@/lib/api";
+import { getPrazos, getLinkInscricaoCalendario, downloadPrazosIcs, type PrazoListItem } from "@/lib/api";
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const TIPOS = [
@@ -49,6 +49,9 @@ export function Prazos() {
   });
   const [status, setStatus] = useState<string>("");
   const [tipo, setTipo] = useState<string>("");
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [exportando, setExportando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
 
   const { inicio, fim } = useMemo(
     () => getInicioFimMes(ref.ano, ref.mes),
@@ -101,6 +104,28 @@ export function Prazos() {
     else setRef({ ano: ref.ano, mes: ref.mes + 1 });
   };
 
+  const handleExportIcs = async () => {
+    setExportando(true);
+    try {
+      await downloadPrazosIcs({ inicio, fim });
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const handleObterLink = async () => {
+    const data = await getLinkInscricaoCalendario();
+    setLinkUrl(data.url);
+  };
+
+  const handleCopiarLink = () => {
+    if (linkUrl) {
+      navigator.clipboard.writeText(linkUrl);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -110,6 +135,55 @@ export function Prazos() {
         <p className="text-muted-foreground">
           Calendário e filtros para visualizar prazos processuais.
         </p>
+      </div>
+
+      {/* Enviar para agenda */}
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <h3 className="mb-3 font-semibold text-foreground">Enviar para minha agenda</h3>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Exporte seus prazos em .ics para importar no Google, Outlook ou iPhone. Ou use o link de
+          inscrição para a agenda atualizar sozinha.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExportIcs}
+            disabled={exportando}
+            className="rounded-lg border border-border bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {exportando ? "Gerando…" : "Exportar .ics (download)"}
+          </button>
+          <button
+            type="button"
+            onClick={handleObterLink}
+            className="rounded-lg border border-border bg-muted/50 px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            Obter link de inscrição
+          </button>
+          {linkUrl && (
+            <div className="flex w-full flex-1 basis-full items-center gap-2 md:w-auto md:flex-1">
+              <input
+                type="text"
+                readOnly
+                value={linkUrl}
+                className="min-w-0 flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleCopiarLink}
+                className="shrink-0 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm font-medium hover:bg-muted"
+              >
+                {copiado ? "Copiado!" : "Copiar"}
+              </button>
+            </div>
+          )}
+        </div>
+        {linkUrl && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            No Google Calendar: Outros calendários → Inscrever-se por URL. No Outlook: Adicionar
+            calendário → Assinar da Web. Cole o link acima.
+          </p>
+        )}
       </div>
 
       {/* Filtros */}

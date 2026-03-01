@@ -44,6 +44,8 @@ export const usuarios = pgTable("usuarios", {
   numeroOab: varchar("numero_oab", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  /** Token para link de inscrição do calendário (.ics); único por usuário. */
+  calendarFeedToken: varchar("calendar_feed_token", { length: 64 }),
 });
 
 // --- Prazos ---
