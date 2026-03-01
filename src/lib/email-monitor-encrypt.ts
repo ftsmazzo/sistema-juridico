@@ -1,6 +1,7 @@
 /**
  * Criptografia da senha da conta de e-mail (IMAP).
- * Usa AES-256-GCM; chave em EMAIL_MONITOR_ENCRYPTION_KEY (64 chars hex = 32 bytes).
+ * Usa AES-256-GCM. Chave: EMAIL_MONITOR_ENCRYPTION_KEY (32 ou 64 caracteres hex).
+ * Se 32 caracteres, é duplicada para obter 32 bytes.
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
@@ -10,12 +11,20 @@ const TAG_LEN = 16;
 
 function getKey(): Buffer {
   const env = process.env.EMAIL_MONITOR_ENCRYPTION_KEY;
-  if (!env || env.length !== 64 || !/^[0-9a-fA-F]+$/.test(env)) {
+  if (!env || !/^[0-9a-fA-F]+$/.test(env)) {
     throw new Error(
-      "EMAIL_MONITOR_ENCRYPTION_KEY deve ser 64 caracteres hex (ex.: openssl rand -hex 32)"
+      "Criptografia não configurada. Defina EMAIL_MONITOR_ENCRYPTION_KEY (32 ou 64 caracteres hex) no servidor."
     );
   }
-  return Buffer.from(env, "hex");
+  if (env.length === 32) {
+    return Buffer.from(env + env, "hex");
+  }
+  if (env.length === 64) {
+    return Buffer.from(env, "hex");
+  }
+  throw new Error(
+    "EMAIL_MONITOR_ENCRYPTION_KEY deve ter 32 ou 64 caracteres hex (ex.: openssl rand -hex 16 ou rand -hex 32)."
+  );
 }
 
 export function encryptPassword(plain: string): string {
