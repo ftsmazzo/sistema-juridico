@@ -1,6 +1,7 @@
 /**
- * Executa uma verificação de e-mail: IMAP → extração Recorte → cria apenas publicações (sem IA).
- * A análise e os prazos ficam para o N8N (botão "Análise com IA").
+ * Executa uma verificação de e-mail: IMAP → extração Recorte → cria publicações.
+ * Se WEBHOOK_N8N_ANALISE_PUBLICACAO_URL estiver configurado, dispara a análise com IA para cada
+ * publicação criada e grava resumo, movimentações e prazos.
  */
 import { db } from "../db/index.js";
 import { contaEmailMonitoramento } from "../db/schema.js";
@@ -9,6 +10,7 @@ import { decryptPassword } from "./email-monitor-encrypt.js";
 import { fetchRecentEmails } from "./email-monitor-imap.js";
 import { extrairPublicacoesDeEmail } from "./extrator-recorte-email.js";
 import { processarItemPublicacaoOab } from "./processar-publicacao-oab.js";
+import { executarAnaliseN8nParaPublicacao } from "../routes/publicacoes-disparar-n8n.js";
 
 export type CheckResult = {
   ok: boolean;
@@ -95,6 +97,15 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
         if (result.publicacaoId) {
           publicacoesCriadas++;
           if (result.prazoIds?.length) prazosCriados += result.prazoIds.length;
+          if (!result.skipped && process.env.WEBHOOK_N8N_ANALISE_PUBLICACAO_URL?.trim()) {
+            const analiseResult = await executarAnaliseN8nParaPublicacao(result.publicacaoId);
+            if (analiseResult.analiseGravada && analiseResult.prazosCriados > 0) {
+              prazosCriados += analiseResult.prazosCriados;
+            }
+            if (!analiseResult.ok && analiseResult.erro) {
+              console.error(`IA publicação ${result.publicacaoId}:`, analiseResult.erro);
+            }
+          }
         }
       }
     }
