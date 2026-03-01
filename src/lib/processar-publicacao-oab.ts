@@ -2,6 +2,11 @@
  * Lógica compartilhada para processar um item de publicação OAB:
  * grava publicação, análise IA, movimentações, prazos e vínculos com usuários.
  * Usado pelo webhook (N8N) e pelo cadastro por print.
+ *
+ * Prazos só são criados quando o item já traz dados de IA (resumo, baseLegal, observacoesIa ou movimentacoes).
+ * Se o webhook enviar apenas extração regex (sem IA), a publicação é gravada mas nenhum prazo é criado;
+ * quando a análise da IA chegar depois (ex.: botão "Análise com IA" ou PATCH), criarPrazosAPartirDePublicacao
+ * é chamado e os prazos são criados/atualizados a partir da IA.
  */
 import { db } from "../db/index.js";
 import {
@@ -13,7 +18,6 @@ import {
   usuarios,
 } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
-import type { ItemPublicacaoOab } from "./publicacoes-oab.types.js";
 import {
   adicionarDiasUteis,
   formatarDataSql,
@@ -141,6 +145,13 @@ export async function processarItemPublicacaoOab(
   const movs = Array.isArray(item.movimentacoes) ? item.movimentacoes : [];
   const diasSugerido = item.prazoDiasUteisSugerido ?? DIAS_UTEIS_PRAZO_INTIMACAO;
 
+  if (!temDadosIa) {
+    return {
+      publicacaoId,
+      prazoIds: undefined,
+    };
+  }
+
   for (let ordem = 0; ordem < movs.length; ordem++) {
     const mov = movs[ordem];
     const tipo = (mov?.tipo ?? "").trim() || "Outros";
@@ -244,4 +255,141 @@ export async function processarItemPublicacaoOab(
     publicacaoId,
     prazoIds: prazoIds.length > 0 ? prazoIds : undefined,
   };
+}
+
+/**
+ * Cria movimentações e prazos a partir dos dados de IA já gravados na publicação.
+ * Usado quando a análise da IA chega depois (ex.: botão "Análise com IA" ou PATCH com resumo/movimentacoes).
+ * Remove prazos/movimentações existentes desta publicação e recria a partir do JSON de IA.
+ */
+export async function criarPrazosAPartirDePublicacao(
+  publicacaoId: number
+): Promise<{ prazoIds: number[] }> {
+  const [row] = await db
+    .select()
+    .from(publicacoesOab)
+    .where(eq(publicacoesOab.id, publicacaoId))
+    .limit(1);
+  if (!row) return { prazoIds: [] };
+
+  const movs = Array.isArray(row.movimentacoes) ? row.movimentacoes : [];
+  const temDadosIa =
+    (row.resumo && row.resumo.trim()) ||
+    (row.observacoesIa && row.observacoesIa.trim()) ||
+    (row.baseLegal && row.baseLegal.trim()) ||
+    movs.length > 0;
+  if (!temDadosIa) return { prazoIds: [] };
+
+  await db.delete(prazos).where(eq(prazos.publicacaoOabId, publicacaoId));
+  await db.delete(movimentacoes).where(eq(movimentacoes.publicacaoOabId, publicacaoId));
+
+  const prazoIds: number[] = [];
+  const diasSugerido = row.prazoDiasUteisSugerido ?? DIAS_UTEIS_PRAZO_INTIMACAO;
+  const dataPub = row.dataPublicacao ?? row.dataDisponibilizacao ?? "";
+  const numeroProcesso = row.numeroProcesso ?? "";
+  const vara = row.vara ?? null;
+
+  for (let ordem = 0; ordem < movs.length; ordem++) {
+    const mov = movs[ordem];
+    const tipo = (mov?.tipo ?? "").trim() || "Outros";
+    const resumoMov = typeof mov?.resumo === "string" ? mov.resumo : null;
+    const ehIntimacao =
+      tipo.toLowerCase().includes("intimação") || tipo.toLowerCase().includes("intimacao");
+    const diasUteis = ehIntimacao ? diasSugerido : 0;
+    const dataLimite =
+      diasUteis > 0 && dataPub
+        ? formatarDataSql(adicionarDiasUteis(dataPub, diasUteis))
+        : null;
+
+    const [movInserted] = await db
+      .insert(movimentacoes)
+      .values({
+        publicacaoOabId: publicacaoId,
+        tipo: tipo.slice(0, 100),
+        resumo: resumoMov,
+        ordem: ordem + 1,
+        prazoDiasUteis: diasUteis > 0 ? diasUteis : null,
+        dataLimite: dataLimite ?? null,
+        baseLegal: v(row.baseLegal, 255),
+      })
+      .returning({ id: movimentacoes.id });
+
+    if (ehIntimacao && movInserted?.id && dataLimite) {
+      const observacao = [numeroProcesso, vara].filter(Boolean).join(" | ");
+      const nomePrazo = `${tipo} ${numeroProcesso}`.slice(0, 255);
+      const [prazo] = await db
+        .insert(prazos)
+        .values({
+          tipo: "civil",
+          data: dataLimite,
+          observacao,
+          conteudo: row.textoCompleto ?? resumoMov ?? "",
+          prazo: nomePrazo,
+          status: 0,
+          publicacaoOabId: publicacaoId,
+          movimentacaoId: movInserted.id,
+          numeroProcesso: numeroProcesso || null,
+        })
+        .returning({ id: prazos.id });
+      if (prazo?.id) prazoIds.push(prazo.id);
+    }
+  }
+
+  if (prazoIds.length === 0 && movs.length === 0) {
+    const tipoNorm = (row.tipoPublicacao ?? "").toLowerCase();
+    const ehIntimacaoPub =
+      tipoNorm.includes("intimação") || tipoNorm.includes("intimacao");
+    if (ehIntimacaoPub && dataPub) {
+      const dataLimite = adicionarDiasUteis(dataPub, DIAS_UTEIS_PRAZO_INTIMACAO);
+      const dataPrazoStr = formatarDataSql(dataLimite);
+      const observacao = [numeroProcesso, vara].filter(Boolean).join(" | ");
+      const nomePrazo = `Intimação ${numeroProcesso}`.slice(0, 255);
+      const [prazo] = await db
+        .insert(prazos)
+        .values({
+          tipo: "civil",
+          data: dataPrazoStr,
+          observacao,
+          conteudo: row.textoCompleto ?? "",
+          prazo: nomePrazo,
+          status: 0,
+          publicacaoOabId: publicacaoId,
+          numeroProcesso: numeroProcesso || null,
+        })
+        .returning({ id: prazos.id });
+      if (prazo?.id) prazoIds.push(prazo.id);
+    }
+  }
+
+  const oabsPublicacao = new Set<string>();
+  if (row.numeroOab) {
+    const n = normalizarOab(row.numeroOab);
+    if (n) oabsPublicacao.add(n);
+  }
+  const advogados = row.advogados as { oab?: string }[] | null;
+  if (Array.isArray(advogados)) {
+    advogados.forEach((a) => {
+      const n = normalizarOab(a.oab);
+      if (n) oabsPublicacao.add(n);
+    });
+  }
+
+  const usuariosDoEscritorio = await db
+    .select({ id: usuarios.id, numeroOab: usuarios.numeroOab })
+    .from(usuarios)
+    .where(eq(usuarios.ativo, true));
+
+  for (const pid of prazoIds) {
+    for (const u of usuariosDoEscritorio) {
+      const oabUser = normalizarOab(u.numeroOab ?? undefined);
+      if (oabUser && oabsPublicacao.has(oabUser)) {
+        await db.insert(prazosUsuarios).values({
+          idPrazo: pid,
+          idUsuario: u.id,
+        });
+      }
+    }
+  }
+
+  return { prazoIds };
 }

@@ -7,7 +7,8 @@ O sistema pode enviar uma publicação para o N8N **apenas para rodar a análise
 1. O sistema faz **POST** para o webhook com a publicação.
 2. O N8N executa o nó de IA (ex.: Claude) e **responde** com o resultado no body.
 3. O sistema **lê a resposta**, extrai a análise e **grava** na publicação (resumo, baseLegal, observacoesIa, movimentacoes, prazoDiasUteisSugerido).
-4. O usuário vê "Análise recebida e gravada na publicação." e pode atualizar a página para ver os dados.
+4. O sistema **cria ou atualiza os prazos** a partir desses dados de IA (movimentações + prazos na agenda), substituindo qualquer prazo que tenha sido criado antes (ex.: por regex).
+5. O usuário vê "Análise recebida e gravada na publicação." e pode atualizar a página para ver os dados e os prazos.
 
 Assim o N8N não precisa chamar de volta a API (PATCH). Basta configurar o webhook para **Respond to Webhook** com o JSON no formato abaixo.
 

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { publicacoesOab } from "../db/schema.js";
 import { desc, eq } from "drizzle-orm";
+import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
 
 export type PublicacaoListItem = {
   id: number;
@@ -217,6 +218,14 @@ export async function updatePublicacao(
     if (!updated) {
       res.status(404).json({ error: "Publicação não encontrada" });
       return;
+    }
+
+    if ("movimentacoes" in update || "prazoDiasUteisSugerido" in update) {
+      try {
+        await criarPrazosAPartirDePublicacao(id);
+      } catch (err) {
+        console.error("Criar prazos a partir da publicação:", err);
+      }
     }
 
     const row = updated;

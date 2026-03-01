@@ -12,6 +12,7 @@ import type { RequestWithUser } from "../middleware/auth.js";
 import { db } from "../db/index.js";
 import { publicacoesOab } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
 
 /** Trunca string para limite do varchar. */
 function v(s: string | null | undefined, max: number): string | null {
@@ -168,6 +169,7 @@ export async function dispararAnaliseN8n(
 
       if (Object.keys(update).length > 0) {
         await db.update(publicacoesOab).set(update).where(eq(publicacoesOab.id, id));
+        await criarPrazosAPartirDePublicacao(id);
       }
       res.json({
         ok: true,
