@@ -16,6 +16,8 @@ import {
   prazos,
   prazosUsuarios,
   usuarios,
+  pessoas,
+  processos,
 } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import type { ItemPublicacaoOab } from "./publicacoes-oab.types.js";
@@ -259,18 +261,36 @@ export async function processarItemPublicacaoOab(
       if (n) oabsPublicacao.add(n);
     });
     const usuariosDoEscritorio = await db
-      .select({ id: usuarios.id, numeroOab: usuarios.numeroOab })
+      .select({
+        id: usuarios.id,
+        numeroOab: usuarios.numeroOab,
+        pessoaOab: pessoas.numeroOab,
+      })
       .from(usuarios)
+      .leftJoin(pessoas, eq(usuarios.idPessoa, pessoas.id))
       .where(eq(usuarios.ativo, true));
+    const idsParaVincular = new Set<number>();
+    for (const u of usuariosDoEscritorio) {
+      const oabUser = normalizarOab(u.numeroOab ?? undefined);
+      const oabPessoa = normalizarOab(u.pessoaOab ?? undefined);
+      if ((oabUser && oabsPublicacao.has(oabUser)) || (oabPessoa && oabsPublicacao.has(oabPessoa))) {
+        idsParaVincular.add(u.id);
+      }
+    }
+    if (numeroProcesso) {
+      const [proc] = await db
+        .select({ idAdvogadoResponsavel: processos.idAdvogadoResponsavel })
+        .from(processos)
+        .where(eq(processos.numeroCnj, numeroProcesso))
+        .limit(1);
+      if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
+    }
     for (const pid of prazoIds) {
-      for (const u of usuariosDoEscritorio) {
-        const oabUser = normalizarOab(u.numeroOab ?? undefined);
-        if (oabUser && oabsPublicacao.has(oabUser)) {
-          await db.insert(prazosUsuarios).values({
-            idPrazo: pid,
-            idUsuario: u.id,
-          });
-        }
+      for (const idUsuario of idsParaVincular) {
+        await db.insert(prazosUsuarios).values({
+          idPrazo: pid,
+          idUsuario,
+        });
       }
     }
     return {
@@ -363,19 +383,36 @@ export async function processarItemPublicacaoOab(
   });
 
   const usuariosDoEscritorio = await db
-    .select({ id: usuarios.id, numeroOab: usuarios.numeroOab })
+    .select({
+      id: usuarios.id,
+      numeroOab: usuarios.numeroOab,
+      pessoaOab: pessoas.numeroOab,
+    })
     .from(usuarios)
+    .leftJoin(pessoas, eq(usuarios.idPessoa, pessoas.id))
     .where(eq(usuarios.ativo, true));
-
+  const idsParaVincular = new Set<number>();
+  for (const u of usuariosDoEscritorio) {
+    const oabUser = normalizarOab(u.numeroOab ?? undefined);
+    const oabPessoa = normalizarOab(u.pessoaOab ?? undefined);
+    if ((oabUser && oabsPublicacao.has(oabUser)) || (oabPessoa && oabsPublicacao.has(oabPessoa))) {
+      idsParaVincular.add(u.id);
+    }
+  }
+  if (numeroProcesso) {
+    const [proc] = await db
+      .select({ idAdvogadoResponsavel: processos.idAdvogadoResponsavel })
+      .from(processos)
+      .where(eq(processos.numeroCnj, numeroProcesso))
+      .limit(1);
+    if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
+  }
   for (const pid of prazoIds) {
-    for (const u of usuariosDoEscritorio) {
-      const oabUser = normalizarOab(u.numeroOab ?? undefined);
-      if (oabUser && oabsPublicacao.has(oabUser)) {
-        await db.insert(prazosUsuarios).values({
-          idPrazo: pid,
-          idUsuario: u.id,
-        });
-      }
+    for (const idUsuario of idsParaVincular) {
+      await db.insert(prazosUsuarios).values({
+        idPrazo: pid,
+        idUsuario,
+      });
     }
   }
 
@@ -471,6 +508,7 @@ export async function criarPrazosAPartirDePublicacao(
           publicacaoOabId: publicacaoId,
           movimentacaoId: movInserted.id,
           numeroProcesso: numeroProcesso || null,
+          processoId: row.processoId ?? null,
         })
         .returning({ id: prazos.id });
       if (prazo?.id) prazoIds.push(prazo.id);
@@ -497,6 +535,7 @@ export async function criarPrazosAPartirDePublicacao(
           status: 0,
           publicacaoOabId: publicacaoId,
           numeroProcesso: numeroProcesso || null,
+          processoId: row.processoId ?? null,
         })
         .returning({ id: prazos.id });
       if (prazo?.id) prazoIds.push(prazo.id);
@@ -517,19 +556,38 @@ export async function criarPrazosAPartirDePublicacao(
   }
 
   const usuariosDoEscritorio = await db
-    .select({ id: usuarios.id, numeroOab: usuarios.numeroOab })
+    .select({
+      id: usuarios.id,
+      numeroOab: usuarios.numeroOab,
+      pessoaOab: pessoas.numeroOab,
+    })
     .from(usuarios)
+    .leftJoin(pessoas, eq(usuarios.idPessoa, pessoas.id))
     .where(eq(usuarios.ativo, true));
 
+  const idsParaVincular = new Set<number>();
+  for (const u of usuariosDoEscritorio) {
+    const oabUser = normalizarOab(u.numeroOab ?? undefined);
+    const oabPessoa = normalizarOab(u.pessoaOab ?? undefined);
+    if ((oabUser && oabsPublicacao.has(oabUser)) || (oabPessoa && oabsPublicacao.has(oabPessoa))) {
+      idsParaVincular.add(u.id);
+    }
+  }
+  if (row.processoId) {
+    const [proc] = await db
+      .select({ idAdvogadoResponsavel: processos.idAdvogadoResponsavel })
+      .from(processos)
+      .where(eq(processos.id, row.processoId))
+      .limit(1);
+    if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
+  }
+
   for (const pid of prazoIds) {
-    for (const u of usuariosDoEscritorio) {
-      const oabUser = normalizarOab(u.numeroOab ?? undefined);
-      if (oabUser && oabsPublicacao.has(oabUser)) {
-        await db.insert(prazosUsuarios).values({
-          idPrazo: pid,
-          idUsuario: u.id,
-        });
-      }
+    for (const idUsuario of idsParaVincular) {
+      await db.insert(prazosUsuarios).values({
+        idPrazo: pid,
+        idUsuario,
+      });
     }
   }
 

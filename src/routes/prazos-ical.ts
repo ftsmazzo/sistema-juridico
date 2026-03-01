@@ -6,43 +6,11 @@
 import { Response } from "express";
 import type { RequestWithUser } from "../middleware/auth.js";
 import { db } from "../db/index.js";
-import { prazos, prazosUsuarios, usuarios } from "../db/schema.js";
-import { eq, and, gte, lte } from "drizzle-orm";
-import { buildIcsFromPrazos, type PrazoParaIcs } from "../lib/ical-prazos.js";
+import { usuarios } from "../db/schema.js";
+import { eq } from "drizzle-orm";
+import { buildIcsFromPrazos } from "../lib/ical-prazos.js";
+import { getPrazosDoUsuarioParaIcs } from "../lib/prazos-do-usuario.js";
 import crypto from "crypto";
-
-async function getPrazosDoUsuario(
-  userId: number,
-  inicio?: string,
-  fim?: string
-): Promise<PrazoParaIcs[]> {
-  const conditions = [eq(prazosUsuarios.idUsuario, userId)];
-  if (inicio) conditions.push(gte(prazos.data, inicio));
-  if (fim) conditions.push(lte(prazos.data, fim));
-
-  const rows = await db
-    .select({
-      id: prazos.id,
-      data: prazos.data,
-      prazo: prazos.prazo,
-      tipo: prazos.tipo,
-      numeroProcesso: prazos.numeroProcesso,
-      observacao: prazos.observacao,
-    })
-    .from(prazos)
-    .innerJoin(prazosUsuarios, eq(prazosUsuarios.idPrazo, prazos.id))
-    .where(and(...conditions))
-    .orderBy(prazos.data, prazos.prazo);
-
-  return rows.map((r) => ({
-    id: r.id,
-    data: String(r.data),
-    prazo: r.prazo,
-    tipo: r.tipo,
-    numeroProcesso: r.numeroProcesso,
-    observacao: r.observacao,
-  }));
-}
 
 /** GET /api/prazos/export.ics — download .ics dos prazos do usuário (autenticado). */
 export async function getExportIcs(
@@ -57,7 +25,7 @@ export async function getExportIcs(
   const fim = (req.query.fim as string)?.trim().slice(0, 10);
 
   try {
-    const lista = await getPrazosDoUsuario(req.user.id, inicio || undefined, fim || undefined);
+    const lista = await getPrazosDoUsuarioParaIcs(req.user.id, inicio || undefined, fim || undefined);
     const ics = buildIcsFromPrazos(lista);
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader("Content-Disposition", 'attachment; filename="prazos.ics"');
@@ -90,10 +58,10 @@ export async function getFeedIcs(
   }
 
   try {
-    const lista = await getPrazosDoUsuario(u.id);
+    const lista = await getPrazosDoUsuarioParaIcs(u.id);
     const ics = buildIcsFromPrazos(lista, "Prazos - Agenda Prazos");
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Cache-Control", "private, max-age=300"); // 5 min
+    res.setHeader("Cache-Control", "private, max-age=300");
     res.send(ics);
   } catch (err) {
     console.error("Feed .ics:", err);
@@ -136,5 +104,6 @@ export async function getLinkInscricao(
 
   const baseUrl = process.env.PUBLIC_URL || req.protocol + "://" + req.get("host") || "";
   const url = `${baseUrl.replace(/\/$/, "")}/api/prazos/feed.ics?token=${token}`;
-  res.json({ url });
+  const totalPrazos = (await getPrazosDoUsuarioParaIcs(req.user.id)).length;
+  res.json({ url, totalPrazos });
 }
