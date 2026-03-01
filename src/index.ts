@@ -4,7 +4,7 @@ import express from "express";
 import { handlePublicacoesOab } from "./routes/webhooks/publicacoes-oab.js";
 import { getDashboard } from "./routes/dashboard.js";
 import { listPrazos } from "./routes/prazos.js";
-import { getExportIcs, getFeedIcs, getLinkInscricao } from "./routes/prazos-ical.js";
+import { getExportIcs, getFeedIcs, getLinkInscricao, postBackfillUsuarios } from "./routes/prazos-ical.js";
 import {
   listPublicacoes,
   getPublicacaoById,
@@ -69,6 +69,7 @@ app.get("/api/dashboard", getDashboard);
 app.get("/api/prazos/export.ics", requireAuth, getExportIcs);
 app.get("/api/prazos/feed.ics", getFeedIcs);
 app.get("/api/prazos/link-inscricao", requireAuth, getLinkInscricao);
+app.post("/api/prazos/backfill-usuarios", requireAuth, postBackfillUsuarios);
 app.get("/api/prazos", listPrazos);
 app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);

@@ -19,7 +19,7 @@ import {
   pessoas,
   processos,
 } from "../db/schema.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import type { ItemPublicacaoOab } from "./publicacoes-oab.types.js";
 import {
   adicionarDiasUteis,
@@ -35,9 +35,14 @@ function v(s: string | null | undefined, max: number): string | null {
   return t.length > max ? t.slice(0, max) : t;
 }
 
+/** Formato canônico para comparação: sem espaços, traços ou barras; maiúsculo. Ex: "SP 123", "SP/123", "SP-123" → "SP123". */
 export function normalizarOab(oab: string | undefined): string | null {
   if (!oab || !oab.trim()) return null;
-  return oab.replace(/\s*-\s*/g, "/").trim().toUpperCase();
+  return oab
+    .replace(/\s/g, "")
+    .replace(/[-/]/g, "")
+    .trim()
+    .toUpperCase();
 }
 
 /** Mescla advogados por OAB normalizada; evita duplicatas. */
@@ -592,4 +597,91 @@ export async function criarPrazosAPartirDePublicacao(
   }
 
   return { prazoIds };
+}
+
+/**
+ * Backfill: para todos os prazos com publicação OAB, vincula em prazos_usuarios
+ * os usuários que batem por OAB (usuário/pessoa) ou por processo (advogado responsável).
+ * Útil após deploy para que prazos antigos apareçam no calendário de quem tem OAB/processo.
+ */
+export async function backfillPrazosUsuarios(): Promise<{ prazosProcessados: number; vinculosInseridos: number }> {
+  const prazosComPub = await db
+    .select({
+      id: prazos.id,
+      publicacaoOabId: prazos.publicacaoOabId,
+      numeroOab: publicacoesOab.numeroOab,
+      advogados: publicacoesOab.advogados,
+      processoId: publicacoesOab.processoId,
+    })
+    .from(prazos)
+    .innerJoin(publicacoesOab, eq(prazos.publicacaoOabId, publicacoesOab.id));
+
+  if (prazosComPub.length === 0) return { prazosProcessados: 0, vinculosInseridos: 0 };
+
+  const usuariosDoEscritorio = await db
+    .select({
+      id: usuarios.id,
+      numeroOab: usuarios.numeroOab,
+      pessoaOab: pessoas.numeroOab,
+    })
+    .from(usuarios)
+    .leftJoin(pessoas, eq(usuarios.idPessoa, pessoas.id))
+    .where(eq(usuarios.ativo, true));
+
+  const existing = await db
+    .select({ idPrazo: prazosUsuarios.idPrazo, idUsuario: prazosUsuarios.idUsuario })
+    .from(prazosUsuarios)
+    .where(inArray(prazosUsuarios.idPrazo, prazosComPub.map((p) => p.id)));
+  const existingSet = new Set(existing.map((e) => `${e.idPrazo}-${e.idUsuario}`));
+
+  let vinculosInseridos = 0;
+  const byPub = new Map<number, typeof prazosComPub>();
+  for (const p of prazosComPub) {
+    const pid = p.publicacaoOabId ?? 0;
+    if (!byPub.has(pid)) byPub.set(pid, []);
+    byPub.get(pid)!.push(p);
+  }
+
+  for (const [, prazoList] of byPub) {
+    const first = prazoList[0];
+    const oabsPublicacao = new Set<string>();
+    if (first.numeroOab) {
+      const n = normalizarOab(first.numeroOab);
+      if (n) oabsPublicacao.add(n);
+    }
+    const advogados = first.advogados as { oab?: string }[] | null;
+    if (Array.isArray(advogados)) {
+      advogados.forEach((a) => {
+        const n = normalizarOab(a.oab);
+        if (n) oabsPublicacao.add(n);
+      });
+    }
+    const idsParaVincular = new Set<number>();
+    for (const u of usuariosDoEscritorio) {
+      const oabUser = normalizarOab(u.numeroOab ?? undefined);
+      const oabPessoa = normalizarOab(u.pessoaOab ?? undefined);
+      if ((oabUser && oabsPublicacao.has(oabUser)) || (oabPessoa && oabsPublicacao.has(oabPessoa))) {
+        idsParaVincular.add(u.id);
+      }
+    }
+    if (first.processoId) {
+      const [proc] = await db
+        .select({ idAdvogadoResponsavel: processos.idAdvogadoResponsavel })
+        .from(processos)
+        .where(eq(processos.id, first.processoId))
+        .limit(1);
+      if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
+    }
+    for (const row of prazoList) {
+      for (const idUsuario of idsParaVincular) {
+        const key = `${row.id}-${idUsuario}`;
+        if (existingSet.has(key)) continue;
+        existingSet.add(key);
+        await db.insert(prazosUsuarios).values({ idPrazo: row.id, idUsuario });
+        vinculosInseridos++;
+      }
+    }
+  }
+
+  return { prazosProcessados: prazosComPub.length, vinculosInseridos };
 }
