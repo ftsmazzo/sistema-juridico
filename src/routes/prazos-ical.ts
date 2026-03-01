@@ -2,6 +2,7 @@
  * GET /api/prazos/export.ics — exporta os prazos do usuário logado em .ics (download).
  * GET /api/prazos/feed.ics?token=XXX — feed de inscrição (sem auth; token identifica o usuário).
  * GET /api/prazos/link-inscricao — retorna a URL de inscrição do usuário (gera token se não existir).
+ * POST /api/prazos/backfill-usuarios — backfill prazos_usuarios por OAB/processo (para calendário).
  */
 import { Response } from "express";
 import type { RequestWithUser } from "../middleware/auth.js";
@@ -10,6 +11,7 @@ import { usuarios } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { buildIcsFromPrazos } from "../lib/ical-prazos.js";
 import { getPrazosDoUsuarioParaIcs } from "../lib/prazos-do-usuario.js";
+import { backfillPrazosUsuarios } from "../lib/processar-publicacao-oab.js";
 import crypto from "crypto";
 
 /** GET /api/prazos/export.ics — download .ics dos prazos do usuário (autenticado). */
@@ -76,7 +78,7 @@ function generateFeedToken(): string {
 /** GET /api/prazos/link-inscricao — retorna a URL de inscrição; gera token se não existir. */
 export async function getLinkInscricao(
   req: RequestWithUser,
-  res: Response<{ url: string } | { error: string }>
+  res: Response<{ url: string; totalPrazos: number } | { error: string }>
 ): Promise<void> {
   if (!req.user) {
     res.status(401).json({ error: "Não autenticado" });
@@ -106,4 +108,22 @@ export async function getLinkInscricao(
   const url = `${baseUrl.replace(/\/$/, "")}/api/prazos/feed.ics?token=${token}`;
   const totalPrazos = (await getPrazosDoUsuarioParaIcs(req.user.id)).length;
   res.json({ url, totalPrazos });
+}
+
+/** POST /api/prazos/backfill-usuarios — vincula prazos a usuários por OAB/processo (calendário). */
+export async function postBackfillUsuarios(
+  req: RequestWithUser,
+  res: Response<{ prazosProcessados: number; vinculosInseridos: number } | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  try {
+    const result = await backfillPrazosUsuarios();
+    res.json(result);
+  } catch (err) {
+    console.error("Backfill prazos_usuarios:", err);
+    res.status(500).json({ error: "Erro ao executar backfill" });
+  }
 }
