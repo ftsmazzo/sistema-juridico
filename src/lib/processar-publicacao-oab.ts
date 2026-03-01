@@ -286,7 +286,20 @@ export async function criarPrazosAPartirDePublicacao(
 
   const prazoIds: number[] = [];
   const diasSugerido = row.prazoDiasUteisSugerido ?? DIAS_UTEIS_PRAZO_INTIMACAO;
-  const dataPub = row.dataPublicacao ?? row.dataDisponibilizacao ?? "";
+  let dataPub = row.dataPublicacao ?? row.dataDisponibilizacao ?? "";
+  if (!dataPub && row.dataProcessamento) {
+    const match = String(row.dataProcessamento).match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (match) {
+      let d = match[1];
+      const parts = d.split("/");
+      if (parts[2].length === 2) {
+        const ano = parseInt(parts[2], 10);
+        parts[2] = ano >= 50 ? `19${parts[2]}` : `20${parts[2]}`;
+        d = parts.join("/");
+      }
+      dataPub = d;
+    }
+  }
   const numeroProcesso = row.numeroProcesso ?? "";
   const vara = row.vara ?? null;
 

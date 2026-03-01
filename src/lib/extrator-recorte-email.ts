@@ -26,6 +26,20 @@ function pick(regex: RegExp, str: string, def = ""): string {
   return m ? (m[1] !== undefined ? m[1].trim() : m[0].trim()) : def;
 }
 
+/** Aceita DD/MM/YYYY ou DD/MM/YY; normaliza para DD/MM/YYYY. */
+function normalizarData(str: string): string {
+  if (!str || !str.trim()) return "";
+  const parts = str.trim().split(/[/-]/);
+  if (parts.length !== 3) return str.trim();
+  let [d, m, a] = parts.map((p) => p.replace(/\D/g, ""));
+  if (!d || !m || !a) return str.trim();
+  if (a.length === 2) {
+    const ano = parseInt(a, 10);
+    a = ano >= 50 ? `19${a}` : `20${a}`;
+  }
+  return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${a}`;
+}
+
 function norm(s: string | undefined): string {
   return (s || "").replace(/\s+/g, " ").trim();
 }
@@ -85,8 +99,8 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
     }
   }
 
-  if (blocos.length <= 1 && /Data de Disponibilização/.test(raw)) {
-    const reDataDisp = /Data de Disponibilização:\s*(\d{2}\/\d{2}\/\d{4})/gi;
+  if (blocos.length <= 1 && /Data\s+(de|da)\s+Disponibilização/i.test(raw)) {
+    const reDataDisp = /Data\s+(?:de|da)\s+Disponibilização:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/gi;
     const dataMatches: { num: number; start: number }[] = [];
     let idx = 0;
     while ((m = reDataDisp.exec(raw)) !== null) {
@@ -99,7 +113,7 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
   }
 
   if (blocos.length === 0) {
-    if (/Data de Disponibilização/.test(raw) && /PROCESSO:\s*\d{7}/.test(raw)) {
+    if (/Data\s+(de|da)\s+Disponibilização/i.test(raw) && /PROCESSO:\s*\d{7}/.test(raw)) {
       blocos = [{ num: 1, start: 0 }];
     } else {
       return [];
@@ -117,8 +131,14 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
     const totalIdx = t.search(/Total de Publicações:\s*\d+/i);
     if (totalIdx >= 0) t = t.slice(0, totalIdx).trim();
 
-    const dataDisp = pick(/Data de Disponibilização:\s*(\d{2}\/\d{2}\/\d{4})/i, t);
-    const dataPub = pick(/Data de Publicação:\s*(\d{2}\/\d{2}\/\d{4})/i, t);
+    const dataDispRaw =
+      pick(/Data\s+de\s+Disponibilização:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
+      pick(/Data\s+da\s+Disponibilização:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t);
+    const dataPubRaw =
+      pick(/Data\s+de\s+Publicação:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
+      pick(/Data\s+da\s+Publicação:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t);
+    const dataDisp = dataDispRaw ? normalizarData(dataDispRaw) : "";
+    const dataPub = dataPubRaw ? normalizarData(dataPubRaw) : "";
     const jornal = norm(pick(/Jornal:\s*([^\n]+?)(?=\s*Página:|$)/i, t));
     const pagina = pick(/Página:\s*(\d+)/i, t);
     const caderno = norm(pick(/Caderno:\s*([^\n]+?)(?=\s*Local:|$)/i, t));
