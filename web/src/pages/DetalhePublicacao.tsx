@@ -67,6 +67,61 @@ function Campo({
   );
 }
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+/** Formata o texto completo para exibição: seções por ||| e ||, parágrafos por \\n, links clicáveis. */
+function TextoCompletoFormatado({ texto }: { texto: string | null }) {
+  if (!texto || !texto.trim()) return <span className="text-muted-foreground">—</span>;
+
+  const linkify = (s: string, keyPrefix: string) => {
+    const parts = s.split(URL_REGEX);
+    return parts.map((p, i) =>
+      /^https?:\/\//.test(p) ? (
+        <a
+          key={`${keyPrefix}-${i}`}
+          href={p}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline break-all hover:opacity-80"
+        >
+          {p}
+        </a>
+      ) : (
+        p
+      )
+    );
+  };
+
+  const sections = texto.trim().split(/\s*\|\|\|\s*/).filter(Boolean);
+
+  return (
+    <div className="space-y-5 text-sm leading-relaxed text-foreground">
+      {sections.map((sec, i) => {
+        const blocks = sec.split(/\s*\|\|\s*/).filter(Boolean);
+        return (
+          <div key={i} className="space-y-3">
+            {blocks.map((block, j) => {
+              const paras = block
+                .split(/\n+/)
+                .map((p) => p.trim())
+                .filter(Boolean);
+              return (
+                <div key={j} className="space-y-1.5">
+                  {paras.map((para, k) => (
+                    <p key={k} className="text-sm leading-relaxed">
+                      {linkify(para, `p-${i}-${j}-${k}`)}
+                    </p>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DetalhePublicacao() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
@@ -347,9 +402,9 @@ export function DetalhePublicacao() {
             onChange={(v) => setForm((f) => ({ ...f, textoCompleto: v || null }))}
           />
         ) : (
-          <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded border border-border/60 bg-muted/20 p-3 text-xs text-foreground">
-            {pub.textoCompleto || "—"}
-          </pre>
+          <div className="max-h-[28rem] overflow-auto rounded-lg border border-border/60 bg-muted/20 p-4">
+            <TextoCompletoFormatado texto={pub.textoCompleto ?? null} />
+          </div>
         )}
       </section>
     </div>
