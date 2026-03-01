@@ -7,6 +7,7 @@ import { db } from "../db/index.js";
 import { publicacoesOab } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { criarPrazosAPartirDePublicacao } from "./processar-publicacao-oab.js";
+import { enviarNotificacaoPublicacao } from "./notifica-publicacao.js";
 
 function v(s: string | null | undefined, max: number): string | null {
   if (s == null || s === "") return null;
@@ -158,10 +159,12 @@ export async function executarAnaliseN8nParaPublicacao(
 
     await db.update(publicacoesOab).set(update).where(eq(publicacoesOab.id, publicacaoId));
     const { prazoIds } = await criarPrazosAPartirDePublicacao(publicacaoId);
+    const totalPrazos = prazoIds?.length ?? 0;
+    enviarNotificacaoPublicacao(publicacaoId, totalPrazos).catch(() => {});
     return {
       ok: true,
       analiseGravada: true,
-      prazosCriados: prazoIds?.length ?? 0,
+      prazosCriados: totalPrazos,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
