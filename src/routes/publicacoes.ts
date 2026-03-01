@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../db/index.js";
-import { publicacoesOab } from "../db/schema.js";
-import { desc, eq } from "drizzle-orm";
+import { publicacoesOab, movimentacoes as movimentacoesTable } from "../db/schema.js";
+import { desc, eq, asc } from "drizzle-orm";
 import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
 
 export type PublicacaoListItem = {
@@ -93,6 +93,9 @@ export type PublicacaoDetalhe = {
   prazoDiasUteisSugerido: number | null;
   observacoesIa: string | null;
   movimentacoes: { tipo: string; resumo: string }[] | null;
+  /** Movimentações da tabela (com fonte: email | ia | escavador) */
+  movimentacoesComFonte: { tipo: string; resumo: string | null; ordem: number; fonte: string }[];
+  fontesEmail: { emailId?: string; from?: string; to?: string }[];
   createdAt: string;
 };
 
@@ -121,6 +124,17 @@ export async function getPublicacaoById(
       res.status(404).json({ error: "Publicação não encontrada" });
       return;
     }
+
+    const movsComFonte = await db
+      .select({
+        tipo: movimentacoesTable.tipo,
+        resumo: movimentacoesTable.resumo,
+        ordem: movimentacoesTable.ordem,
+        fonte: movimentacoesTable.fonte,
+      })
+      .from(movimentacoesTable)
+      .where(eq(movimentacoesTable.publicacaoOabId, id))
+      .orderBy(asc(movimentacoesTable.ordem), asc(movimentacoesTable.id));
 
     res.json({
       id: row.id,
@@ -155,6 +169,13 @@ export async function getPublicacaoById(
       prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
       observacoesIa: row.observacoesIa,
       movimentacoes: row.movimentacoes ?? null,
+      movimentacoesComFonte: movsComFonte.map((m) => ({
+        tipo: m.tipo,
+        resumo: m.resumo,
+        ordem: m.ordem,
+        fonte: m.fonte,
+      })),
+      fontesEmail: (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[],
       createdAt: row.createdAt.toISOString(),
     });
   } catch (err) {
@@ -229,6 +250,17 @@ export async function updatePublicacao(
     }
 
     const row = updated;
+    const movsComFonte = await db
+      .select({
+        tipo: movimentacoesTable.tipo,
+        resumo: movimentacoesTable.resumo,
+        ordem: movimentacoesTable.ordem,
+        fonte: movimentacoesTable.fonte,
+      })
+      .from(movimentacoesTable)
+      .where(eq(movimentacoesTable.publicacaoOabId, id))
+      .orderBy(asc(movimentacoesTable.ordem), asc(movimentacoesTable.id));
+
     res.json({
       id: row.id,
       emailId: row.emailId,
@@ -262,6 +294,13 @@ export async function updatePublicacao(
       prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
       observacoesIa: row.observacoesIa,
       movimentacoes: row.movimentacoes ?? null,
+      movimentacoesComFonte: movsComFonte.map((m) => ({
+        tipo: m.tipo,
+        resumo: m.resumo,
+        ordem: m.ordem,
+        fonte: m.fonte,
+      })),
+      fontesEmail: (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[],
       createdAt: row.createdAt.toISOString(),
     });
   } catch (err) {

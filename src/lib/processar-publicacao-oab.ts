@@ -38,6 +38,64 @@ export function normalizarOab(oab: string | undefined): string | null {
   return oab.replace(/\s*-\s*/g, "/").trim().toUpperCase();
 }
 
+/** Mescla advogados por OAB normalizada; evita duplicatas. */
+function mergeAdvogados(
+  existentes: { nome?: string; oab?: string }[] | null,
+  novoPrincipal?: string,
+  novoOab?: string,
+  novosAdvogados?: { nome?: string; oab?: string }[]
+): { nome: string; oab: string }[] {
+  const byOab = new Map<string, { nome: string; oab: string }>();
+  (existentes ?? []).forEach((a) => {
+    const oabNorm = normalizarOab(a.oab);
+    if (oabNorm && a.nome) byOab.set(oabNorm, { nome: a.nome.trim(), oab: (a.oab ?? "").trim() });
+  });
+  if (novoPrincipal && novoOab) {
+    const oabNorm = normalizarOab(novoOab);
+    if (oabNorm) byOab.set(oabNorm, { nome: novoPrincipal.trim(), oab: novoOab.trim() });
+  }
+  (novosAdvogados ?? []).forEach((a) => {
+    const oabNorm = normalizarOab(a.oab);
+    if (oabNorm && a.nome) byOab.set(oabNorm, { nome: a.nome.trim(), oab: (a.oab ?? "").trim() });
+  });
+  return Array.from(byOab.values());
+}
+
+/** Quando a mesma publicação chega de outro e-mail (outro advogado): enriquece sem sobrescrever nem duplicar. */
+async function enriquecerPublicacaoExistente(
+  publicacaoId: number,
+  item: ItemPublicacaoOab
+): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(publicacoesOab)
+    .where(eq(publicacoesOab.id, publicacaoId))
+    .limit(1);
+  if (!row) return;
+
+  const advogadosAtuais = (row.advogados ?? []) as { nome?: string; oab?: string }[];
+  const advogadosMerged = mergeAdvogados(
+    advogadosAtuais,
+    item.advogado,
+    item.numeroOab,
+    item.advogados
+  );
+
+  const fontesAtuais = (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[];
+  const jaTemEmail = fontesAtuais.some((f) => f.emailId === item.emailId);
+  const fontesMerged = jaTemEmail
+    ? fontesAtuais
+    : [...fontesAtuais, { emailId: item.emailId, from: item.from, to: item.to }];
+
+  await db
+    .update(publicacoesOab)
+    .set({
+      advogados: advogadosMerged.length ? advogadosMerged : null,
+      fontesEmail: fontesMerged,
+    })
+    .where(eq(publicacoesOab.id, publicacaoId));
+}
+
 export async function processarItemPublicacaoOab(
   item: ItemPublicacaoOab
 ): Promise<{ publicacaoId?: number; prazoIds?: number[]; skipped?: string }> {
@@ -64,7 +122,7 @@ export async function processarItemPublicacaoOab(
 
   if (numeroProcesso && identificadorDocumento) {
     const [existenteProcesso] = await db
-      .select({ id: publicacoesOab.id })
+      .select()
       .from(publicacoesOab)
       .where(
         and(
@@ -73,7 +131,10 @@ export async function processarItemPublicacaoOab(
         )
       )
       .limit(1);
-    if (existenteProcesso) return { skipped: "processo_documento_ja_existe" };
+    if (existenteProcesso) {
+      await enriquecerPublicacaoExistente(existenteProcesso.id, item);
+      return { publicacaoId: existenteProcesso.id };
+    }
   }
 
   const dateEmail = item.date ? new Date(item.date) : null;
@@ -113,6 +174,7 @@ export async function processarItemPublicacaoOab(
       prazoDiasUteisSugerido: item.prazoDiasUteisSugerido ?? null,
       observacoesIa: item.observacoesIa ?? null,
       movimentacoes: item.movimentacoes ?? null,
+      fontesEmail: [{ emailId: item.emailId ?? undefined, from: item.from, to: item.to }],
     })
     .returning({ id: publicacoesOab.id });
 
@@ -147,9 +209,73 @@ export async function processarItemPublicacaoOab(
   const diasSugerido = item.prazoDiasUteisSugerido ?? DIAS_UTEIS_PRAZO_INTIMACAO;
 
   if (!temDadosIa) {
+    const tipoPub = (item.tipoPublicacao ?? "").trim() || "Outros";
+    const [movEmail] = await db
+      .insert(movimentacoes)
+      .values({
+        publicacaoOabId: publicacaoId,
+        tipo: tipoPub.slice(0, 100),
+        resumo: null,
+        ordem: 1,
+        prazoDiasUteis: null,
+        dataLimite: null,
+        baseLegal: null,
+        fonte: "email",
+      })
+      .returning({ id: movimentacoes.id });
+
+    const tipoNorm = tipoPub.toLowerCase();
+    const ehIntimacaoPub =
+      tipoNorm.includes("intimação") || tipoNorm.includes("intimacao");
+    if (ehIntimacaoPub && dataPub) {
+      const dataLimite = adicionarDiasUteis(dataPub, DIAS_UTEIS_PRAZO_INTIMACAO);
+      const dataPrazoStr = formatarDataSql(dataLimite);
+      const observacao = [numeroProcesso, item.vara].filter(Boolean).join(" | ");
+      const nomePrazo = `Intimação ${numeroProcesso}`.slice(0, 255);
+      const [prazo] = await db
+        .insert(prazos)
+        .values({
+          tipo: "civil",
+          data: dataPrazoStr,
+          observacao,
+          conteudo: item.textoCompleto ?? "",
+          prazo: nomePrazo,
+          status: 0,
+          publicacaoOabId: publicacaoId,
+          movimentacaoId: movEmail?.id ?? null,
+          numeroProcesso: numeroProcesso || null,
+        })
+        .returning({ id: prazos.id });
+      if (prazo?.id) prazoIds.push(prazo.id);
+    }
+
+    const oabsPublicacao = new Set<string>();
+    if (item.numeroOab) {
+      const n = normalizarOab(item.numeroOab);
+      if (n) oabsPublicacao.add(n);
+    }
+    (item.advogados ?? []).forEach((a: { oab?: string }) => {
+      const n = normalizarOab(a.oab);
+      if (n) oabsPublicacao.add(n);
+    });
+    const usuariosDoEscritorio = await db
+      .select({ id: usuarios.id, numeroOab: usuarios.numeroOab })
+      .from(usuarios)
+      .where(eq(usuarios.ativo, true));
+    for (const pid of prazoIds) {
+      for (const u of usuariosDoEscritorio) {
+        const oabUser = normalizarOab(u.numeroOab ?? undefined);
+        if (oabUser && oabsPublicacao.has(oabUser)) {
+          await db.insert(prazosUsuarios).values({
+            idPrazo: pid,
+            idUsuario: u.id,
+          });
+        }
+      }
+    }
     return {
       publicacaoId,
-      prazoIds: undefined,
+      prazoIds: prazoIds.length > 0 ? prazoIds : undefined,
     };
   }
 
@@ -175,6 +301,7 @@ export async function processarItemPublicacaoOab(
         prazoDiasUteis: diasUteis > 0 ? diasUteis : null,
         dataLimite: dataLimite ?? null,
         baseLegal: v(item.baseLegal, 255),
+        fonte: "ia",
       })
       .returning({ id: movimentacoes.id });
 
@@ -325,6 +452,7 @@ export async function criarPrazosAPartirDePublicacao(
         prazoDiasUteis: diasUteis > 0 ? diasUteis : null,
         dataLimite: dataLimite ?? null,
         baseLegal: v(row.baseLegal, 255),
+        fonte: "ia",
       })
       .returning({ id: movimentacoes.id });
 

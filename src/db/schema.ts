@@ -304,6 +304,7 @@ export const publicacoesOab = pgTable(
     prazoDiasUteisSugerido: integer("prazo_dias_uteis_sugerido"),
     observacoesIa: text("observacoes_ia"),
     movimentacoes: jsonb("movimentacoes").$type<{ tipo: string; resumo: string }[]>(),
+    fontesEmail: jsonb("fontes_email").$type<{ emailId?: string; from?: string; to?: string }[]>().default([]),
     processoId: integer("processo_id").references(() => processos.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -328,6 +329,7 @@ export const movimentacoes = pgTable("movimentacoes", {
   prazoDiasUteis: integer("prazo_dias_uteis"), // sugerido pela IA
   dataLimite: date("data_limite"), // calculada a partir da data da publicação
   baseLegal: varchar("base_legal", { length: 255 }),
+  fonte: varchar("fonte", { length: 20 }).notNull().default("ia"), // 'email' | 'ia' | 'escavador'
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
