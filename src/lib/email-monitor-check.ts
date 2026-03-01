@@ -10,7 +10,7 @@ import { decryptPassword } from "./email-monitor-encrypt.js";
 import { fetchRecentEmails } from "./email-monitor-imap.js";
 import { extrairPublicacoesDeEmail } from "./extrator-recorte-email.js";
 import { processarItemPublicacaoOab } from "./processar-publicacao-oab.js";
-import { executarAnaliseN8nParaPublicacao } from "../routes/publicacoes-disparar-n8n.js";
+import { executarAnaliseN8nParaPublicacao } from "./analise-n8n-publicacao.js";
 
 export type CheckResult = {
   ok: boolean;
