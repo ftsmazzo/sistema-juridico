@@ -290,6 +290,7 @@ export async function processarItemPublicacaoOab(
         .limit(1);
       if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
     }
+    if (idsParaVincular.size === 0) usuariosDoEscritorio.forEach((u) => idsParaVincular.add(u.id));
     for (const pid of prazoIds) {
       for (const idUsuario of idsParaVincular) {
         await db.insert(prazosUsuarios).values({
@@ -412,6 +413,7 @@ export async function processarItemPublicacaoOab(
       .limit(1);
     if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
   }
+  if (idsParaVincular.size === 0) usuariosDoEscritorio.forEach((u) => idsParaVincular.add(u.id));
   for (const pid of prazoIds) {
     for (const idUsuario of idsParaVincular) {
       await db.insert(prazosUsuarios).values({
@@ -586,6 +588,7 @@ export async function criarPrazosAPartirDePublicacao(
       .limit(1);
     if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
   }
+  if (idsParaVincular.size === 0) usuariosDoEscritorio.forEach((u) => idsParaVincular.add(u.id));
 
   for (const pid of prazoIds) {
     for (const idUsuario of idsParaVincular) {
@@ -671,6 +674,10 @@ export async function backfillPrazosUsuarios(): Promise<{ prazosProcessados: num
         .where(eq(processos.id, first.processoId))
         .limit(1);
       if (proc?.idAdvogadoResponsavel) idsParaVincular.add(proc.idAdvogadoResponsavel);
+    }
+    // Fallback: se não deu para correlacionar por OAB nem por processo, vincula a todos os usuários ativos
+    if (idsParaVincular.size === 0) {
+      usuariosDoEscritorio.forEach((u) => idsParaVincular.add(u.id));
     }
     for (const row of prazoList) {
       for (const idUsuario of idsParaVincular) {
