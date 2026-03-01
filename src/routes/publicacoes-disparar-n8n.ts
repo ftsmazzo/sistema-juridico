@@ -25,7 +25,7 @@ type AnalisePayload = {
   baseLegal?: string | null;
   prazoDiasUteisSugerido?: number | null;
   observacoesIa?: string | null;
-  movimentacoes?: { tipo?: string; resumo?: string }[] | null;
+  movimentacoes?: { tipo: string; resumo: string }[] | null;
 };
 
 /** Extrai e normaliza a análise do formato de resposta do N8N (array com content[].text = JSON). */
