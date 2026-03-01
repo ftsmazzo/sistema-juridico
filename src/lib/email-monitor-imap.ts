@@ -90,9 +90,10 @@ export async function fetchRecentEmails(
         const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
         const messageId =
           typeof parsed.messageId === "string" ? parsed.messageId : `uid-${msg.uid}`;
+        const subject = typeof parsed.subject === "string" ? parsed.subject : "";
         results.push({
           messageId,
-          subject: parsed.subject ?? "",
+          subject,
           from: (fromObj as { text?: string } | undefined)?.text ?? fromAddr,
           to: (toObj as { text?: string } | undefined)?.text ?? "",
           date: parsed.date ?? new Date(),
