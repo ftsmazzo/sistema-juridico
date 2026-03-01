@@ -3,7 +3,7 @@
  * POST no WEBHOOK_N8N_NOTIFICA com payload: msg (formatada), numeroEnvio (5516999999999), etc.
  */
 import { db } from "../db/index.js";
-import { publicacoesOab, prazos, usuarios } from "../db/schema.js";
+import { publicacoesOab, prazos, usuarios, pessoas } from "../db/schema.js";
 import { eq, asc } from "drizzle-orm";
 import { normalizarOab } from "./processar-publicacao-oab.js";
 
@@ -44,23 +44,56 @@ function formatarNumeroParaEvolution(celular: string | null | undefined): string
 }
 
 /**
- * Busca telefone (celular) do usuário pelo número OAB (normalizado).
+ * Busca telefone (celular) do usuário/pessoa pelo número OAB (normalizado).
+ * Consulta usuarios.numeroOab e, se houver idPessoa, pessoas.numeroOab; usa celular do usuário ou da pessoa.
  * Retorna número formatado 5516999999999 ou null.
  */
 async function buscarTelefonePorOab(numeroOab: string | null | undefined): Promise<string | null> {
   if (!numeroOab || !String(numeroOab).trim()) return null;
   const oabNorm = normalizarOab(numeroOab);
   if (!oabNorm) return null;
+
   const users = await db
-    .select({ numeroOab: usuarios.numeroOab, celular: usuarios.celular })
+    .select({
+      numeroOab: usuarios.numeroOab,
+      celular: usuarios.celular,
+      idPessoa: usuarios.idPessoa,
+    })
     .from(usuarios)
     .where(eq(usuarios.ativo, true));
+
   for (const u of users) {
-    if (normalizarOab(u.numeroOab ?? undefined) === oabNorm) {
-      const formatted = formatarNumeroParaEvolution(u.celular);
-      if (formatted) return formatted;
+    const oabUsuario = normalizarOab(u.numeroOab ?? undefined);
+    if (oabUsuario === oabNorm) {
+      let cel = formatarNumeroParaEvolution(u.celular);
+      if (cel) return cel;
+      if (u.idPessoa) {
+        const [pessoa] = await db
+          .select({ numeroOab: pessoas.numeroOab, celular: pessoas.celular })
+          .from(pessoas)
+          .where(eq(pessoas.id, u.idPessoa!))
+          .limit(1);
+        if (pessoa) {
+          cel = formatarNumeroParaEvolution(pessoa.celular);
+          if (cel) return cel;
+        }
+      }
     }
   }
+
+  for (const u of users) {
+    if (!u.idPessoa) continue;
+    const [pessoa] = await db
+      .select({ numeroOab: pessoas.numeroOab, celular: pessoas.celular })
+      .from(pessoas)
+      .where(eq(pessoas.id, u.idPessoa!))
+      .limit(1);
+    if (pessoa && normalizarOab(pessoa.numeroOab ?? undefined) === oabNorm) {
+      const cel = formatarNumeroParaEvolution(pessoa.celular);
+      if (cel) return cel;
+    }
+  }
+
   return null;
 }
 
@@ -217,7 +250,7 @@ export async function enviarNotificacaoPublicacao(
       numeroProcesso: row.numeroProcesso,
       tipoPublicacao: row.tipoPublicacao,
       dataPublicacao: row.dataPublicacao,
-      numeroEnvio: numeroEnvio ?? undefined,
+      numeroEnvio: numeroEnvio ?? null,
     };
 
     const response = await fetch(url.trim(), {
@@ -355,7 +388,7 @@ export async function enviarNotificacaoAgrupada(
     const payload: PayloadNotificacao = {
       msg,
       prazosCriados: totalPrazos,
-      numeroEnvio: numeroEnvio ?? undefined,
+      numeroEnvio: numeroEnvio ?? null,
     };
 
     const response = await fetch(url.trim(), {
