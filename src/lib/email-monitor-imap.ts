@@ -26,6 +26,10 @@ export type ImapConfig = {
 const INBOX = "INBOX";
 const MAX_MESSAGES = 100;
 
+function asString(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
 async function streamToBuffer(
   stream: NodeJS.ReadableStream | Buffer
 ): Promise<Buffer> {
@@ -94,8 +98,8 @@ export async function fetchRecentEmails(
         results.push({
           messageId,
           subject,
-          from: (fromObj as { text?: string } | undefined)?.text ?? fromAddr,
-          to: (toObj as { text?: string } | undefined)?.text ?? "",
+          from: asString((fromObj as { text?: unknown } | undefined)?.text) || fromAddr,
+          to: asString((toObj as { text?: unknown } | undefined)?.text),
           date: parsed.date ?? new Date(),
           text,
           html,
