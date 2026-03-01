@@ -251,6 +251,7 @@ export const dadosEscavador = pgTable(
 
 // --- Conta de e-mail para monitoramento (IMAP: Yahoo, OAB, etc.) ---
 // Uma conta por sistema; verificação automática a cada interval_minutes; extração cria só publicações; análise IA fica no N8N (botão).
+// idUsuario/numeroOab: vinculam a conta a um usuário para buscar telefone na notificação WhatsApp.
 export const contaEmailMonitoramento = pgTable("conta_email_monitoramento", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 255 }).notNull().default("Conta principal"),
@@ -264,6 +265,10 @@ export const contaEmailMonitoramento = pgTable("conta_email_monitoramento", {
   lastCheckedAt: timestamp("last_checked_at"),
   lastError: text("last_error"),
   ativo: boolean("ativo").notNull().default(true),
+  /** Usuário vinculado: usado para buscar celular na notificação (prioridade sobre numeroOab da conta). */
+  idUsuario: integer("id_usuario").references(() => usuarios.id, { onDelete: "set null" }),
+  /** OAB do advogado da conta: alternativa para buscar celular quando idUsuario não estiver preenchido. */
+  numeroOab: varchar("numero_oab", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

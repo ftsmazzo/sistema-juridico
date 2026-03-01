@@ -216,6 +216,10 @@ export type EmailMonitorConfig = {
   lastCheckedAt: string | null;
   lastError: string | null;
   ativo: boolean;
+  /** ID do usuário vinculado (para notificação WhatsApp). */
+  idUsuario: number | null;
+  /** OAB do advogado da conta (alternativa para notificação). */
+  numeroOab: string | null;
   createdAt: string;
   updatedAt: string;
 };

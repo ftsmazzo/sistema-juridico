@@ -28,6 +28,8 @@ export type ConfigResponse = {
   lastCheckedAt: string | null;
   lastError: string | null;
   ativo: boolean;
+  idUsuario: number | null;
+  numeroOab: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,6 +46,8 @@ function toConfigResponse(row: {
   lastCheckedAt: Date | null;
   lastError: string | null;
   ativo: boolean;
+  idUsuario: number | null;
+  numeroOab: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): ConfigResponse {
@@ -59,6 +63,8 @@ function toConfigResponse(row: {
     lastCheckedAt: row.lastCheckedAt ? row.lastCheckedAt.toISOString() : null,
     lastError: row.lastError,
     ativo: row.ativo,
+    idUsuario: row.idUsuario ?? null,
+    numeroOab: row.numeroOab ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -91,6 +97,8 @@ export async function getEmailMonitorConfig(
       lastCheckedAt: null,
       lastError: null,
       ativo: false,
+      idUsuario: null,
+      numeroOab: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -246,6 +254,12 @@ function upsertConta(
     : [];
   const intervalMinutes = typeof body.intervalMinutes === "number" ? body.intervalMinutes : 15;
   const ativo = body.ativo !== false;
+  const idUsuario =
+    body.idUsuario !== undefined && body.idUsuario !== null && body.idUsuario !== ""
+      ? Number(body.idUsuario)
+      : null;
+  const numeroOab =
+    typeof body.numeroOab === "string" ? body.numeroOab.trim() || null : null;
 
   if (!host || !user) {
     res.status(400).json({ error: "host e user são obrigatórios" });
@@ -262,6 +276,8 @@ function upsertConta(
       remetentesFiltro,
       intervalMinutes,
       ativo,
+      idUsuario: Number.isInteger(idUsuario) ? idUsuario : null,
+      numeroOab,
       updatedAt: new Date(),
     };
     if (passwordPlain) {
@@ -309,6 +325,8 @@ function upsertConta(
       remetentesFiltro,
       intervalMinutes,
       ativo,
+      idUsuario: Number.isInteger(idUsuario) ? idUsuario : null,
+      numeroOab,
     })
     .returning()
     .then(([inserted]) => {

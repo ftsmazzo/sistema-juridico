@@ -118,13 +118,18 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
     }
 
     if (notificarPublicacoes.length > 0 && process.env.WEBHOOK_N8N_NOTIFICA?.trim()) {
+      const contaOpts = {
+        idUsuario: conta.idUsuario ?? undefined,
+        numeroOabConta: conta.numeroOab ?? undefined,
+      };
       if (notificarPublicacoes.length === 1) {
         enviarNotificacaoPublicacao(
           notificarPublicacoes[0].publicacaoId,
-          notificarPublicacoes[0].prazosCriados
+          notificarPublicacoes[0].prazosCriados,
+          contaOpts
         ).catch(() => {});
       } else {
-        enviarNotificacaoAgrupada(notificarPublicacoes).catch(() => {});
+        enviarNotificacaoAgrupada(notificarPublicacoes, contaOpts).catch(() => {});
       }
     }
 

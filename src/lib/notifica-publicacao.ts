@@ -98,6 +98,30 @@ async function buscarTelefonePorOab(numeroOab: string | null | undefined): Promi
 }
 
 /**
+ * Busca telefone (celular) do usuário pelo ID (usuarios + pessoas).
+ * Retorna número formatado 5516999999999 ou null.
+ */
+async function buscarTelefonePorUsuarioId(idUsuario: number): Promise<string | null> {
+  const [u] = await db
+    .select({ celular: usuarios.celular, idPessoa: usuarios.idPessoa })
+    .from(usuarios)
+    .where(eq(usuarios.id, idUsuario))
+    .limit(1);
+  if (!u) return null;
+  let cel = formatarNumeroParaEvolution(u.celular);
+  if (cel) return cel;
+  if (u.idPessoa) {
+    const [pessoa] = await db
+      .select({ celular: pessoas.celular })
+      .from(pessoas)
+      .where(eq(pessoas.id, u.idPessoa!))
+      .limit(1);
+    if (pessoa) cel = formatarNumeroParaEvolution(pessoa.celular);
+  }
+  return cel ?? null;
+}
+
+/**
  * Dado uma publicação, retorna a primeira OAB a tentar (principal ou advogados).
  */
 function oabsDaPublicacao(row: {
@@ -184,16 +208,25 @@ export type PayloadNotificacao = {
 
 /**
  * Carrega dados da publicação e prazos, monta o payload e envia para WEBHOOK_N8N_NOTIFICA.
- * Não lança erro; falhas são apenas logadas.
+ * numeroEnvio: prioridade 1) opts.idUsuario (conta), 2) opts.numeroOabConta (conta), 3) OAB das publicações.
  */
 export async function enviarNotificacaoPublicacao(
   publicacaoId: number,
-  prazosCriados: number
+  prazosCriados: number,
+  opts?: { idUsuario?: number | null; numeroOabConta?: string | null }
 ): Promise<void> {
   const url = process.env.WEBHOOK_N8N_NOTIFICA;
   if (!url || !url.trim()) return;
 
   try {
+    let numeroEnvio: string | null = null;
+    if (opts?.idUsuario != null && Number.isInteger(opts.idUsuario)) {
+      numeroEnvio = await buscarTelefonePorUsuarioId(opts.idUsuario);
+    }
+    if (!numeroEnvio && opts?.numeroOabConta) {
+      numeroEnvio = await buscarTelefonePorOab(opts.numeroOabConta);
+    }
+
     const [row] = await db
       .select({
         numeroProcesso: publicacoesOab.numeroProcesso,
@@ -226,10 +259,11 @@ export async function enviarNotificacaoPublicacao(
       }
     }
 
-    let numeroEnvio: string | null = null;
-    for (const oab of oabsDaPublicacao(row)) {
-      numeroEnvio = await buscarTelefonePorOab(oab);
-      if (numeroEnvio) break;
+    if (!numeroEnvio) {
+      for (const oab of oabsDaPublicacao(row)) {
+        numeroEnvio = await buscarTelefonePorOab(oab);
+        if (numeroEnvio) break;
+      }
     }
 
     const msg = montarMensagem({
@@ -318,15 +352,24 @@ function montarMensagemAgrupada(publicacoes: PubParaAgrupada[]): string {
 
 /**
  * Envia uma única notificação agrupando várias publicações (evita várias msgs seguidas).
- * numeroEnvio: primeiro telefone encontrado por OAB entre as publicações.
+ * numeroEnvio: prioridade 1) opts.idUsuario (conta), 2) opts.numeroOabConta (conta), 3) OAB das publicações.
  */
 export async function enviarNotificacaoAgrupada(
-  itens: { publicacaoId: number; prazosCriados: number }[]
+  itens: { publicacaoId: number; prazosCriados: number }[],
+  opts?: { idUsuario?: number | null; numeroOabConta?: string | null }
 ): Promise<void> {
   const url = process.env.WEBHOOK_N8N_NOTIFICA;
   if (!url || !url.trim() || itens.length === 0) return;
 
   try {
+    let numeroEnvio: string | null = null;
+    if (opts?.idUsuario != null && Number.isInteger(opts.idUsuario)) {
+      numeroEnvio = await buscarTelefonePorUsuarioId(opts.idUsuario);
+    }
+    if (!numeroEnvio && opts?.numeroOabConta) {
+      numeroEnvio = await buscarTelefonePorOab(opts.numeroOabConta);
+    }
+
     const publicacoes: PubParaAgrupada[] = [];
     for (const { publicacaoId, prazosCriados } of itens) {
       const [row] = await db
@@ -373,13 +416,14 @@ export async function enviarNotificacaoAgrupada(
 
     if (publicacoes.length === 0) return;
 
-    let numeroEnvio: string | null = null;
-    for (const p of publicacoes) {
-      for (const oab of oabsDaPublicacao(p)) {
-        numeroEnvio = await buscarTelefonePorOab(oab);
+    if (!numeroEnvio) {
+      for (const p of publicacoes) {
+        for (const oab of oabsDaPublicacao(p)) {
+          numeroEnvio = await buscarTelefonePorOab(oab);
+          if (numeroEnvio) break;
+        }
         if (numeroEnvio) break;
       }
-      if (numeroEnvio) break;
     }
 
     const msg = montarMensagemAgrupada(publicacoes);

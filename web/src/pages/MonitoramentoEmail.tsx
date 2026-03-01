@@ -7,6 +7,7 @@ import {
   updateContaEmail,
   deleteContaEmail,
   postVerificarAgora,
+  getUsuarios,
   type EmailMonitorConfig,
 } from "@/lib/api";
 
@@ -52,6 +53,11 @@ export function MonitoramentoEmail() {
     enabled: editingId != null,
   });
 
+  const { data: usuariosList = [] } = useQuery({
+    queryKey: ["usuarios"],
+    queryFn: () => getUsuarios(),
+  });
+
   useEffect(() => {
     if (contaEdit) {
       setForm({
@@ -62,6 +68,8 @@ export function MonitoramentoEmail() {
         user: contaEdit.user,
         intervalMinutes: contaEdit.intervalMinutes,
         ativo: contaEdit.ativo,
+        idUsuario: contaEdit.idUsuario ?? undefined,
+        numeroOab: contaEdit.numeroOab ?? undefined,
       });
       setRemetentesText(
         Array.isArray(contaEdit.remetentesFiltro) ? contaEdit.remetentesFiltro.join("\n") : ""
@@ -136,6 +144,8 @@ export function MonitoramentoEmail() {
       user: "",
       intervalMinutes: 15,
       ativo: true,
+      idUsuario: undefined,
+      numeroOab: undefined,
     });
     setRemetentesText("");
     setModalOpen(true);
@@ -151,6 +161,8 @@ export function MonitoramentoEmail() {
       user: c.user,
       intervalMinutes: c.intervalMinutes,
       ativo: c.ativo,
+      idUsuario: c.idUsuario ?? undefined,
+      numeroOab: c.numeroOab ?? undefined,
     });
     setRemetentesText(Array.isArray(c.remetentesFiltro) ? c.remetentesFiltro.join("\n") : "");
     setModalOpen(true);
@@ -364,6 +376,50 @@ export function MonitoramentoEmail() {
                   rows={2}
                   placeholder="@recortedigital.adv.br"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Usuário (notificação WhatsApp)
+                  </label>
+                  <select
+                    value={form.idUsuario ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        idUsuario: e.target.value === "" ? undefined : parseInt(e.target.value, 10),
+                      }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Nenhum</option>
+                    {usuariosList.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.pessoa ? `${u.pessoa.nome} ${u.pessoa.sobrenome}` : u.login}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Celular do usuário será usado no envio
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    OAB (alternativa)
+                  </label>
+                  <input
+                    type="text"
+                    value={form.numeroOab ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, numeroOab: e.target.value.trim() || undefined }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="Ex: 270074 ou 270074/SP"
+                  />
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Se não escolher usuário, busca por OAB
+                  </p>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground">
