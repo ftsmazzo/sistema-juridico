@@ -203,7 +203,7 @@ export function dispararAnaliseN8n(id: number) {
   );
 }
 
-/** Configuração do monitoramento de e-mail (IMAP). */
+/** Configuração do monitoramento de e-mail (IMAP). Uma conta. */
 export type EmailMonitorConfig = {
   id: number;
   nome: string;
@@ -224,17 +224,42 @@ export function getEmailMonitorConfig() {
   return api.get<EmailMonitorConfig>("/api/email-monitor/config");
 }
 
+/** Lista todas as contas de e-mail. */
+export function listContasEmail() {
+  return api.get<EmailMonitorConfig[]>("/api/email-monitor/contas");
+}
+
+export function getContaEmail(id: number) {
+  return api.get<EmailMonitorConfig>(`/api/email-monitor/contas/${id}`);
+}
+
+export function createContaEmail(body: Partial<EmailMonitorConfig> & { password: string }) {
+  return api.post<EmailMonitorConfig>("/api/email-monitor/contas", body);
+}
+
+export function updateContaEmail(
+  id: number,
+  body: Partial<EmailMonitorConfig> & { password?: string }
+) {
+  return api.put<EmailMonitorConfig>(`/api/email-monitor/contas/${id}`, body);
+}
+
+export function deleteContaEmail(id: number) {
+  return api.delete<{ ok: boolean }>(`/api/email-monitor/contas/${id}`);
+}
+
 export function putEmailMonitorConfig(body: Partial<EmailMonitorConfig> & { password?: string }) {
   return api.put<EmailMonitorConfig>("/api/email-monitor/config", body);
 }
 
-export function postVerificarAgora() {
+/** Verifica uma conta específica ou a primeira ativa. */
+export function postVerificarAgora(contaId?: number) {
   return api.post<{
     ok: boolean;
     publicacoesCriadas: number;
     prazosCriados: number;
     emailsProcessados: number;
-  }>("/api/email-monitor/verificar-agora");
+  }>("/api/email-monitor/verificar-agora", contaId != null ? { contaId } : {});
 }
 
 /** Cadastra publicação(ões) a partir de imagem (print). Extração por IA no backend. */

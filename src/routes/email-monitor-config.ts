@@ -1,14 +1,18 @@
 /**
- * GET /api/email-monitor/config — retorna a conta de e-mail (senha não exposta).
- * PUT /api/email-monitor/config — cria ou atualiza a conta (senha opcional; se enviada, criptografada).
- * POST /api/email-monitor/verificar-agora — dispara uma verificação imediata (IMAP → extração → publicações).
+ * GET /api/email-monitor/config — retorna a primeira conta (compatibilidade).
+ * GET /api/email-monitor/contas — lista todas as contas (senha não exposta).
+ * GET /api/email-monitor/contas/:id — retorna uma conta para edição.
+ * POST /api/email-monitor/contas — cria nova conta.
+ * PUT /api/email-monitor/contas/:id — atualiza conta.
+ * DELETE /api/email-monitor/contas/:id — remove conta.
+ * POST /api/email-monitor/verificar-agora — body opcional { contaId?: number }; verifica uma conta ou a primeira ativa.
  * Requer autenticação.
  */
 import { Response } from "express";
 import type { RequestWithUser } from "../middleware/auth.js";
 import { db } from "../db/index.js";
 import { contaEmailMonitoramento } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { encryptPassword } from "../lib/email-monitor-encrypt.js";
 import { runEmailCheck } from "../lib/email-monitor-check.js";
 
@@ -28,6 +32,38 @@ export type ConfigResponse = {
   updatedAt: string;
 };
 
+function toConfigResponse(row: {
+  id: number;
+  nome: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  remetentesFiltro: unknown;
+  intervalMinutes: number;
+  lastCheckedAt: Date | null;
+  lastError: string | null;
+  ativo: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}): ConfigResponse {
+  return {
+    id: row.id,
+    nome: row.nome,
+    host: row.host,
+    port: row.port,
+    secure: row.secure,
+    user: row.user,
+    remetentesFiltro: Array.isArray(row.remetentesFiltro) ? (row.remetentesFiltro as string[]) : [],
+    intervalMinutes: row.intervalMinutes,
+    lastCheckedAt: row.lastCheckedAt ? row.lastCheckedAt.toISOString() : null,
+    lastError: row.lastError,
+    ativo: row.ativo,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 export async function getEmailMonitorConfig(
   req: RequestWithUser,
   res: Response<ConfigResponse | { error: string }>
@@ -37,7 +73,11 @@ export async function getEmailMonitorConfig(
     return;
   }
 
-  const [row] = await db.select().from(contaEmailMonitoramento).limit(1);
+  const [row] = await db
+    .select()
+    .from(contaEmailMonitoramento)
+    .orderBy(asc(contaEmailMonitoramento.id))
+    .limit(1);
   if (!row) {
     res.status(200).json({
       id: 0,
@@ -57,21 +97,49 @@ export async function getEmailMonitorConfig(
     return;
   }
 
-  res.json({
-    id: row.id,
-    nome: row.nome,
-    host: row.host,
-    port: row.port,
-    secure: row.secure,
-    user: row.user,
-    remetentesFiltro: Array.isArray(row.remetentesFiltro) ? row.remetentesFiltro : [],
-    intervalMinutes: row.intervalMinutes,
-    lastCheckedAt: row.lastCheckedAt ? row.lastCheckedAt.toISOString() : null,
-    lastError: row.lastError,
-    ativo: row.ativo,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  res.json(toConfigResponse(row));
+}
+
+/** GET /api/email-monitor/contas — lista todas as contas. */
+export async function listContas(
+  req: RequestWithUser,
+  res: Response<ConfigResponse[] | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(contaEmailMonitoramento)
+    .orderBy(asc(contaEmailMonitoramento.id));
+  res.json(rows.map(toConfigResponse));
+}
+
+/** GET /api/email-monitor/contas/:id — uma conta para edição. */
+export async function getContaById(
+  req: RequestWithUser,
+  res: Response<ConfigResponse | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const [row] = await db
+    .select()
+    .from(contaEmailMonitoramento)
+    .where(eq(contaEmailMonitoramento.id, id))
+    .limit(1);
+  if (!row) {
+    res.status(404).json({ error: "Conta não encontrada" });
+    return;
+  }
+  res.json(toConfigResponse(row));
 }
 
 export async function putEmailMonitorConfig(
@@ -84,6 +152,89 @@ export async function putEmailMonitorConfig(
   }
 
   const body = req.body as Record<string, unknown>;
+  const idBody = body.id != null ? Number(body.id) : null;
+  const [existente] = await db
+    .select()
+    .from(contaEmailMonitoramento)
+    .where(idBody != null ? eq(contaEmailMonitoramento.id, idBody) : undefined)
+    .orderBy(asc(contaEmailMonitoramento.id))
+    .limit(1);
+  if (idBody != null && !existente) {
+    res.status(404).json({ error: "Conta não encontrada" });
+    return;
+  }
+  return upsertConta(req, res, existente?.id ?? null, body);
+}
+
+/** POST /api/email-monitor/contas — cria nova conta. */
+export async function postConta(
+  req: RequestWithUser,
+  res: Response<ConfigResponse | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  return upsertConta(req, res, null, req.body as Record<string, unknown>);
+}
+
+/** PUT /api/email-monitor/contas/:id — atualiza conta. */
+export async function putConta(
+  req: RequestWithUser,
+  res: Response<ConfigResponse | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const [existente] = await db
+    .select()
+    .from(contaEmailMonitoramento)
+    .where(eq(contaEmailMonitoramento.id, id))
+    .limit(1);
+  if (!existente) {
+    res.status(404).json({ error: "Conta não encontrada" });
+    return;
+  }
+  return upsertConta(req, res, id, req.body as Record<string, unknown>);
+}
+
+/** DELETE /api/email-monitor/contas/:id — remove conta. */
+export async function deleteConta(
+  req: RequestWithUser,
+  res: Response<{ ok: boolean } | { error: string }>
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+  const [row] = await db
+    .delete(contaEmailMonitoramento)
+    .where(eq(contaEmailMonitoramento.id, id))
+    .returning({ id: contaEmailMonitoramento.id });
+  if (!row) {
+    res.status(404).json({ error: "Conta não encontrada" });
+    return;
+  }
+  res.json({ ok: true });
+}
+
+function upsertConta(
+  req: RequestWithUser,
+  res: Response<ConfigResponse | { error: string }>,
+  contaId: number | null,
+  body: Record<string, unknown>
+): void {
   const nome = typeof body.nome === "string" ? body.nome : "Conta principal";
   const host = typeof body.host === "string" ? body.host.trim() : "";
   const port = typeof body.port === "number" ? body.port : 993;
@@ -101,96 +252,83 @@ export async function putEmailMonitorConfig(
     return;
   }
 
-  const [existente] = await db.select().from(contaEmailMonitoramento).limit(1);
+  if (contaId != null) {
+    const update: Record<string, unknown> = {
+      nome,
+      host,
+      port,
+      secure,
+      user,
+      remetentesFiltro,
+      intervalMinutes,
+      ativo,
+      updatedAt: new Date(),
+    };
+    if (passwordPlain) {
+      update.passwordEncrypted = encryptPassword(passwordPlain);
+    }
+    db
+      .update(contaEmailMonitoramento)
+      .set(update as Record<string, string | number | boolean | string[] | Date | null>)
+      .where(eq(contaEmailMonitoramento.id, contaId))
+      .returning()
+      .then(([updated]) => {
+        if (!updated) {
+          res.status(500).json({ error: "Erro ao atualizar configuração" });
+          return;
+        }
+        res.json(toConfigResponse(updated));
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("EMAIL_MONITOR_ENCRYPTION_KEY")) {
+          res.status(503).json({
+            error:
+              "Criptografia não configurada. Defina EMAIL_MONITOR_ENCRYPTION_KEY (64 caracteres hex) no servidor.",
+          });
+          return;
+        }
+        res.status(500).json({ error: msg });
+      });
+    return;
+  }
 
-  try {
-    if (existente) {
-      const update: Record<string, unknown> = {
-        nome,
-        host,
-        port,
-        secure,
-        user,
-        remetentesFiltro,
-        intervalMinutes,
-        ativo,
-        updatedAt: new Date(),
-      };
-      if (passwordPlain) {
-        update.passwordEncrypted = encryptPassword(passwordPlain);
-      }
-      const [updated] = await db
-        .update(contaEmailMonitoramento)
-        .set(update as Record<string, string | number | boolean | string[] | Date | null>)
-        .where(eq(contaEmailMonitoramento.id, existente.id))
-        .returning();
-      if (!updated) {
-        res.status(500).json({ error: "Erro ao atualizar configuração" });
+  if (!passwordPlain) {
+    res.status(400).json({ error: "Senha é obrigatória ao criar nova conta" });
+    return;
+  }
+  const passwordEncrypted = encryptPassword(passwordPlain);
+  db.insert(contaEmailMonitoramento)
+    .values({
+      nome,
+      host,
+      port,
+      secure,
+      user,
+      passwordEncrypted,
+      remetentesFiltro,
+      intervalMinutes,
+      ativo,
+    })
+    .returning()
+    .then(([inserted]) => {
+      if (!inserted) {
+        res.status(500).json({ error: "Erro ao criar configuração" });
         return;
       }
-      res.json({
-        id: updated.id,
-        nome: updated.nome,
-        host: updated.host,
-        port: updated.port,
-        secure: updated.secure,
-        user: updated.user,
-        remetentesFiltro: Array.isArray(updated.remetentesFiltro) ? updated.remetentesFiltro : [],
-        intervalMinutes: updated.intervalMinutes,
-        lastCheckedAt: updated.lastCheckedAt ? updated.lastCheckedAt.toISOString() : null,
-        lastError: updated.lastError,
-        ativo: updated.ativo,
-        createdAt: updated.createdAt.toISOString(),
-        updatedAt: updated.updatedAt.toISOString(),
-      });
-      return;
-    }
-
-    const passwordEncrypted = passwordPlain ? encryptPassword(passwordPlain) : null;
-    const [inserted] = await db
-      .insert(contaEmailMonitoramento)
-      .values({
-        nome,
-        host,
-        port,
-        secure,
-        user,
-        passwordEncrypted,
-        remetentesFiltro,
-        intervalMinutes,
-        ativo,
-      })
-      .returning();
-    if (!inserted) {
-      res.status(500).json({ error: "Erro ao criar configuração" });
-      return;
-    }
-    res.json({
-      id: inserted.id,
-      nome: inserted.nome,
-      host: inserted.host,
-      port: inserted.port,
-      secure: inserted.secure,
-      user: inserted.user,
-      remetentesFiltro: Array.isArray(inserted.remetentesFiltro) ? inserted.remetentesFiltro : [],
-      intervalMinutes: inserted.intervalMinutes,
-      lastCheckedAt: null,
-      lastError: null,
-      ativo: inserted.ativo,
-      createdAt: inserted.createdAt.toISOString(),
-      updatedAt: inserted.updatedAt.toISOString(),
+      res.json(toConfigResponse(inserted));
+    })
+    .catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("EMAIL_MONITOR_ENCRYPTION_KEY")) {
+        res.status(503).json({
+          error:
+            "Criptografia não configurada. Defina EMAIL_MONITOR_ENCRYPTION_KEY (64 caracteres hex) no servidor.",
+        });
+        return;
+      }
+      res.status(500).json({ error: msg });
     });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("EMAIL_MONITOR_ENCRYPTION_KEY")) {
-      res.status(503).json({
-        error:
-          "Criptografia não configurada. Defina EMAIL_MONITOR_ENCRYPTION_KEY (64 caracteres hex) no servidor.",
-      });
-      return;
-    }
-    res.status(500).json({ error: msg });
-  }
 }
 
 export async function postVerificarAgora(
@@ -205,7 +343,12 @@ export async function postVerificarAgora(
     return;
   }
 
-  const result = await runEmailCheck();
+  const body = (req.body || {}) as { contaId?: number };
+  const contaId = typeof body.contaId === "number" && Number.isInteger(body.contaId)
+    ? body.contaId
+    : undefined;
+
+  const result = await runEmailCheck(contaId);
   if (!result.ok && result.erro) {
     res.status(502).json({ error: result.erro });
     return;

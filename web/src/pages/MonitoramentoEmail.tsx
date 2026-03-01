@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getEmailMonitorConfig,
-  putEmailMonitorConfig,
+  listContasEmail,
+  getContaEmail,
+  createContaEmail,
+  updateContaEmail,
+  deleteContaEmail,
   postVerificarAgora,
   type EmailMonitorConfig,
 } from "@/lib/api";
@@ -18,247 +21,425 @@ function formatarData(iso: string | null) {
   });
 }
 
+const INTERVAL_LABELS: Record<number, string> = {
+  5: "5 min",
+  10: "10 min",
+  15: "15 min",
+  30: "30 min",
+  60: "1 h",
+};
+
+type FormState = Partial<EmailMonitorConfig> & { password?: string };
+
 export function MonitoramentoEmail() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<Partial<EmailMonitorConfig> & { password?: string }>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<FormState>({});
   const [remetentesText, setRemetentesText] = useState("");
+  const [verificandoId, setVerificandoId] = useState<number | null>(null);
+  const [resultadoId, setResultadoId] = useState<number | null>(null);
+  const [resultadoMsg, setResultadoMsg] = useState<string | null>(null);
 
-  const { data: config, isPending } = useQuery({
-    queryKey: ["email-monitor-config"],
-    queryFn: getEmailMonitorConfig,
+  const { data: contas = [], isPending } = useQuery({
+    queryKey: ["email-monitor-contas"],
+    queryFn: listContasEmail,
+  });
+
+  const { data: contaEdit } = useQuery({
+    queryKey: ["email-monitor-conta", editingId],
+    queryFn: () => getContaEmail(editingId!),
+    enabled: editingId != null,
   });
 
   useEffect(() => {
-    if (config) {
+    if (contaEdit) {
       setForm({
-        nome: config.nome,
-        host: config.host,
-        port: config.port,
-        secure: config.secure,
-        user: config.user,
-        intervalMinutes: config.intervalMinutes,
-        ativo: config.ativo,
+        nome: contaEdit.nome,
+        host: contaEdit.host,
+        port: contaEdit.port,
+        secure: contaEdit.secure,
+        user: contaEdit.user,
+        intervalMinutes: contaEdit.intervalMinutes,
+        ativo: contaEdit.ativo,
       });
       setRemetentesText(
-        Array.isArray(config.remetentesFiltro) ? config.remetentesFiltro.join("\n") : ""
+        Array.isArray(contaEdit.remetentesFiltro) ? contaEdit.remetentesFiltro.join("\n") : ""
       );
     }
-  }, [config]);
+  }, [contaEdit]);
 
-  const saveMutation = useMutation({
-    mutationFn: () => {
+  const createMutation = useMutation({
+    mutationFn: (body: FormState & { password: string }) => {
       const remetentesFiltro = remetentesText
         .split(/\n/)
         .map((s) => s.trim())
         .filter(Boolean);
-      return putEmailMonitorConfig({
-        ...form,
-        remetentesFiltro,
-        password: form.password || undefined,
-      });
+      return createContaEmail({ ...body, remetentesFiltro });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["email-monitor-config"] });
-      setForm((f) => ({ ...f, password: undefined }));
+      queryClient.invalidateQueries({ queryKey: ["email-monitor-contas"] });
+      setModalOpen(false);
+      setForm({});
+      setRemetentesText("");
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (id: number) => {
+      const remetentesFiltro = remetentesText
+        .split(/\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return updateContaEmail(id, { ...form, remetentesFiltro, password: form.password });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["email-monitor-contas"] });
+      setModalOpen(false);
+      setEditingId(null);
+      setForm({});
+      setRemetentesText("");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteContaEmail,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["email-monitor-contas"] });
     },
   });
 
   const verificarMutation = useMutation({
-    mutationFn: postVerificarAgora,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["email-monitor-config"] });
+    mutationFn: (contaId: number) => postVerificarAgora(contaId),
+    onMutate: (contaId) => setVerificandoId(contaId),
+    onSettled: () => setVerificandoId(null),
+    onSuccess: (data, contaId) => {
+      queryClient.invalidateQueries({ queryKey: ["email-monitor-contas"] });
+      setResultadoId(contaId);
+      setResultadoMsg(
+        `${data.emailsProcessados} e-mail(s), ${data.publicacoesCriadas} publicação(ões) criada(s).`
+      );
+      setTimeout(() => {
+        setResultadoId(null);
+        setResultadoMsg(null);
+      }, 5000);
     },
   });
 
-  const handleSave = () => saveMutation.mutate();
-  const handleVerificarAgora = () => verificarMutation.mutate();
+  const handleOpenNew = () => {
+    setEditingId(null);
+    setForm({
+      nome: "Nova conta",
+      host: "",
+      port: 993,
+      secure: true,
+      user: "",
+      intervalMinutes: 15,
+      ativo: true,
+    });
+    setRemetentesText("");
+    setModalOpen(true);
+  };
 
-  if (isPending || !config) {
+  const handleOpenEdit = (c: EmailMonitorConfig) => {
+    setEditingId(c.id);
+    setForm({
+      nome: c.nome,
+      host: c.host,
+      port: c.port,
+      secure: c.secure,
+      user: c.user,
+      intervalMinutes: c.intervalMinutes,
+      ativo: c.ativo,
+    });
+    setRemetentesText(Array.isArray(c.remetentesFiltro) ? c.remetentesFiltro.join("\n") : "");
+    setModalOpen(true);
+  };
+
+  const handleSave = () => {
+    if (editingId != null) {
+      updateMutation.mutate(editingId);
+    } else {
+      if (!form.password?.trim()) return;
+      createMutation.mutate({ ...form, password: form.password } as FormState & { password: string });
+    }
+  };
+
+  if (isPending) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Carregando configuração…</p>
+      <div className="flex justify-center py-12">
+        <p className="text-muted-foreground">Carregando contas…</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Monitoramento de e-mail</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure a conta IMAP (Yahoo, OAB, etc.). O sistema verifica automaticamente e cria
-          publicações; use o botão &quot;Análise com IA&quot; na publicação para enviar ao N8N e
-          gerar prazos.
-        </p>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Monitoramento de e-mail</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Gerencie várias contas IMAP. Cada conta pode ter verificação automática e botão
+            &quot;Verificar agora&quot;. Publicações são criadas a partir dos e-mails; use
+            &quot;Análise com IA&quot; na publicação para gerar prazos.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleOpenNew}
+          className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Nova conta
+        </button>
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 font-semibold text-foreground">Status</h2>
-        <div className="flex flex-wrap items-center gap-6">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Última verificação</p>
-            <p className="text-sm font-medium text-foreground">
-              {formatarData(config.lastCheckedAt)}
-            </p>
-          </div>
-          {config.lastError && (
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-muted-foreground">Último erro</p>
-              <p className="truncate text-sm text-destructive">{config.lastError}</p>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={handleVerificarAgora}
-            disabled={verificarMutation.isPending || !config.host || !config.user}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {verificarMutation.isPending ? "Verificando…" : "Verificar agora"}
-          </button>
+      <section className="rounded-xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="px-4 py-3 font-medium text-foreground">Nome</th>
+                <th className="px-4 py-3 font-medium text-foreground">Host / Usuário</th>
+                <th className="px-4 py-3 font-medium text-foreground">Intervalo</th>
+                <th className="px-4 py-3 font-medium text-foreground">Última verificação</th>
+                <th className="px-4 py-3 font-medium text-foreground">Status</th>
+                <th className="px-4 py-3 font-medium text-foreground">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contas.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    Nenhuma conta configurada. Clique em &quot;Nova conta&quot; para adicionar.
+                  </td>
+                </tr>
+              ) : (
+                contas.map((c) => (
+                  <tr key={c.id} className="border-b border-border/60">
+                    <td className="px-4 py-3 font-medium text-foreground">{c.nome}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {c.host} · {c.user}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {INTERVAL_LABELS[c.intervalMinutes] ?? `${c.intervalMinutes} min`}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatarData(c.lastCheckedAt)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {c.lastError ? (
+                        <span className="truncate max-w-[180px] block text-destructive" title={c.lastError}>
+                          Erro
+                        </span>
+                      ) : c.ativo ? (
+                        <span className="text-green-600 dark:text-green-400">Ativa</span>
+                      ) : (
+                        <span className="text-muted-foreground">Inativa</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => verificarMutation.mutate(c.id)}
+                          disabled={verificandoId != null || !c.host || !c.user}
+                          className="rounded border border-border bg-muted/50 px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                        >
+                          {verificandoId === c.id ? "Verificando…" : "Verificar agora"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(c)}
+                          className="rounded border border-border bg-muted/50 px-2 py-1 text-xs font-medium hover:bg-muted"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Excluir a conta "${c.nome}"?`))
+                              deleteMutation.mutate(c.id);
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="rounded border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                      {resultadoId === c.id && resultadoMsg && (
+                        <p className="mt-1 text-xs text-muted-foreground">{resultadoMsg}</p>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-        {verificarMutation.isSuccess && verificarMutation.data && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {verificarMutation.data.emailsProcessados} e-mail(s) lidos,{" "}
-            {verificarMutation.data.publicacoesCriadas} publicação(ões) criada(s).
-          </p>
-        )}
-        {verificarMutation.isError && (
-          <p className="mt-3 text-sm text-destructive">
-            {verificarMutation.error instanceof Error ? verificarMutation.error.message : "Erro"}
-          </p>
-        )}
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 font-semibold text-foreground">Conta de e-mail</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">Nome</label>
-            <input
-              type="text"
-              value={form.nome ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              placeholder="Conta principal"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground">Host IMAP</label>
-              <input
-                type="text"
-                value={form.host ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
-                className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                placeholder="imap.exemplo.com"
-              />
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
+            <h2 className="mb-4 font-semibold text-foreground">
+              {editingId != null ? "Editar conta" : "Nova conta"}
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground">Nome</label>
+                <input
+                  type="text"
+                  value={form.nome ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="Ex: OAB Recorte"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground">Host IMAP</label>
+                  <input
+                    type="text"
+                    value={form.host ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    placeholder="imap.exemplo.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground">Porta</label>
+                  <input
+                    type="number"
+                    value={form.port ?? 993}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, port: parseInt(e.target.value, 10) || 993 }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="secure"
+                  checked={form.secure !== false}
+                  onChange={(e) => setForm((f) => ({ ...f, secure: e.target.checked }))}
+                  className="rounded border-border"
+                />
+                <label htmlFor="secure" className="text-sm text-muted-foreground">
+                  SSL/TLS
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground">E-mail (usuário)</label>
+                <input
+                  type="text"
+                  value={form.user ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, user: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="seu@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground">
+                  Senha {editingId != null ? "(deixe em branco para manter)" : ""}
+                </label>
+                <input
+                  type="password"
+                  value={form.password ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground">
+                  Remetentes (um por linha; vazio = todos)
+                </label>
+                <textarea
+                  value={remetentesText}
+                  onChange={(e) => setRemetentesText(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"
+                  rows={2}
+                  placeholder="@recortedigital.adv.br"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground">
+                  Verificar a cada
+                </label>
+                <select
+                  value={form.intervalMinutes ?? 15}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, intervalMinutes: parseInt(e.target.value, 10) }))
+                  }
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                >
+                  <option value={5}>5 minutos</option>
+                  <option value={10}>10 minutos</option>
+                  <option value={15}>15 minutos</option>
+                  <option value={30}>30 minutos</option>
+                  <option value={60}>1 hora</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="ativo"
+                  checked={form.ativo !== false}
+                  onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))}
+                  className="rounded border-border"
+                />
+                <label htmlFor="ativo" className="text-sm text-muted-foreground">
+                  Conta ativa (verificação automática)
+                </label>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground">Porta</label>
-              <input
-                type="number"
-                value={form.port ?? 993}
-                onChange={(e) => setForm((f) => ({ ...f, port: parseInt(e.target.value, 10) || 993 }))}
-                className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalOpen(false);
+                  setEditingId(null);
+                  setForm({});
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={
+                  (editingId != null ? updateMutation.isPending : createMutation.isPending) ||
+                  !form.host?.trim() ||
+                  !form.user?.trim() ||
+                  (editingId == null && !form.password?.trim())
+                }
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {editingId != null
+                  ? updateMutation.isPending
+                    ? "Salvando…"
+                    : "Salvar"
+                  : createMutation.isPending
+                    ? "Criando…"
+                    : "Criar conta"}
+              </button>
             </div>
+            {(createMutation.isError || updateMutation.isError) && (
+              <p className="mt-3 text-sm text-destructive">
+                {createMutation.error instanceof Error
+                  ? createMutation.error.message
+                  : updateMutation.error instanceof Error
+                    ? updateMutation.error.message
+                    : "Erro"}
+              </p>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="secure"
-              checked={form.secure !== false}
-              onChange={(e) => setForm((f) => ({ ...f, secure: e.target.checked }))}
-              className="rounded border-border"
-            />
-            <label htmlFor="secure" className="text-sm text-muted-foreground">
-              Conexão segura (SSL/TLS)
-            </label>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">E-mail (usuário)</label>
-            <input
-              type="text"
-              value={form.user ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, user: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              placeholder="seu@email.com"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">
-              Senha {config.id ? "(deixe em branco para manter a atual)" : ""}
-            </label>
-            <input
-              type="password"
-              value={form.password ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              placeholder="••••••••"
-              autoComplete="new-password"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">
-              Remetentes a monitorar (um por linha; vazio = todos)
-            </label>
-            <textarea
-              value={remetentesText}
-              onChange={(e) => setRemetentesText(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"
-              rows={3}
-              placeholder="recortedigital@adv.br
-@oabsp.org.br"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground">
-              Verificar automaticamente a cada (minutos)
-            </label>
-            <select
-              value={form.intervalMinutes ?? 15}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, intervalMinutes: parseInt(e.target.value, 10) }))
-              }
-              className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            >
-              <option value={5}>5 minutos</option>
-              <option value={10}>10 minutos</option>
-              <option value={15}>15 minutos</option>
-              <option value={30}>30 minutos</option>
-              <option value={60}>1 hora</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="ativo"
-              checked={form.ativo !== false}
-              onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))}
-              className="rounded border-border"
-            />
-            <label htmlFor="ativo" className="text-sm text-muted-foreground">
-              Conta ativa (verificação automática ligada)
-            </label>
-          </div>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saveMutation.isPending || !form.host?.trim() || !form.user?.trim()}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {saveMutation.isPending ? "Salvando…" : "Salvar configuração"}
-          </button>
         </div>
-        {saveMutation.isError && (
-          <p className="mt-3 text-sm text-destructive">
-            {saveMutation.error instanceof Error ? saveMutation.error.message : "Erro ao salvar"}
-          </p>
-        )}
-        {saveMutation.isSuccess && (
-          <p className="mt-3 text-sm text-green-600 dark:text-green-400">Configuração salva.</p>
-        )}
-      </section>
+      )}
     </div>
   );
 }

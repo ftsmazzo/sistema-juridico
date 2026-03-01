@@ -41,6 +41,11 @@ import {
   getEmailMonitorConfig,
   putEmailMonitorConfig,
   postVerificarAgora,
+  listContas,
+  getContaById,
+  postConta,
+  putConta,
+  deleteConta,
 } from "./routes/email-monitor-config.js";
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
@@ -99,6 +104,11 @@ app.post("/api/admin/limpar-dados", requireAuth, limparDados);
 app.post("/api/email-monitor/test", requireAuth, emailMonitorTest);
 app.get("/api/email-monitor/config", requireAuth, getEmailMonitorConfig);
 app.put("/api/email-monitor/config", requireAuth, putEmailMonitorConfig);
+app.get("/api/email-monitor/contas", requireAuth, listContas);
+app.get("/api/email-monitor/contas/:id", requireAuth, getContaById);
+app.post("/api/email-monitor/contas", requireAuth, postConta);
+app.put("/api/email-monitor/contas/:id", requireAuth, putConta);
+app.delete("/api/email-monitor/contas/:id", requireAuth, deleteConta);
 app.post("/api/email-monitor/verificar-agora", requireAuth, postVerificarAgora);
 
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
