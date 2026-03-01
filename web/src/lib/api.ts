@@ -196,6 +196,13 @@ export function updatePublicacao(
   return api.patch<PublicacaoDetalhe>(`/api/publicacoes/${id}`, body);
 }
 
+/** Dispara a análise com IA no N8N (webhook). N8N atualiza a publicação via PATCH depois. */
+export function dispararAnaliseN8n(id: number) {
+  return api.post<{ ok: boolean; message: string }>(
+    `/api/publicacoes/${id}/disparar-analise-n8n`
+  );
+}
+
 /** Cadastra publicação(ões) a partir de imagem (print). Extração por IA no backend. */
 export type PublicacaoPorPrintResponse = {
   publicacaoId: number;

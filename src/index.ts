@@ -9,6 +9,7 @@ import {
   getPublicacaoById,
   updatePublicacao,
 } from "./routes/publicacoes.js";
+import { dispararAnaliseN8n } from "./routes/publicacoes-disparar-n8n.js";
 import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
 import { login } from "./routes/auth.js";
 import { listPessoas, createPessoa, updatePessoa } from "./routes/pessoas.js";
@@ -55,6 +56,7 @@ app.get("/api/prazos", listPrazos);
 app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);
+app.post("/api/publicacoes/:id/disparar-analise-n8n", requireAuth, dispararAnaliseN8n);
 app.post("/api/publicacoes/por-print", requireAuth, publicacaoPorPrint);
 
 app.get("/api/pessoas", requireAuth, listPessoas);

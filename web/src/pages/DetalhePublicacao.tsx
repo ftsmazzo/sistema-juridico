@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPublicacao,
   updatePublicacao,
+  dispararAnaliseN8n,
   type PublicacaoDetalhe,
 } from "@/lib/api";
 
@@ -89,6 +90,14 @@ export function DetalhePublicacao() {
     },
   });
 
+  const analiseN8nMutation = useMutation({
+    mutationFn: () => dispararAnaliseN8n(pubId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publicacao", pubId] });
+      queryClient.invalidateQueries({ queryKey: ["publicacoes"] });
+    },
+  });
+
   const handleSave = () => {
     mutation.mutate(form);
   };
@@ -160,13 +169,24 @@ export function DetalhePublicacao() {
           </p>
         </div>
         {!editando ? (
-          <button
-            type="button"
-            onClick={openEdit}
-            className="shrink-0 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted"
-          >
-            Editar
-          </button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => analiseN8nMutation.mutate()}
+              disabled={analiseN8nMutation.isPending}
+              className="rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+              title="Envia esta publicação para o N8N (final da automação) para rodar apenas a análise com IA. A publicação será atualizada em instantes."
+            >
+              {analiseN8nMutation.isPending ? "Enviando…" : "Análise com IA"}
+            </button>
+            <button
+              type="button"
+              onClick={openEdit}
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Editar
+            </button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <button
@@ -191,6 +211,16 @@ export function DetalhePublicacao() {
       {mutation.isError && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
           {mutation.error instanceof Error ? mutation.error.message : "Erro ao salvar."}
+        </div>
+      )}
+      {analiseN8nMutation.isSuccess && (
+        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm text-foreground">
+          {analiseN8nMutation.data?.message ?? "Enviado para análise no N8N. Atualize a página em instantes."}
+        </div>
+      )}
+      {analiseN8nMutation.isError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
+          {analiseN8nMutation.error instanceof Error ? analiseN8nMutation.error.message : "Erro ao enviar para o N8N."}
         </div>
       )}
 
