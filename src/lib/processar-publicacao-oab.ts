@@ -18,6 +18,7 @@ import {
   usuarios,
 } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
+import type { ItemPublicacaoOab } from "./publicacoes-oab.types.js";
 import {
   adicionarDiasUteis,
   formatarDataSql,
@@ -229,7 +230,7 @@ export async function processarItemPublicacaoOab(
     const n = normalizarOab(item.numeroOab);
     if (n) oabsPublicacao.add(n);
   }
-  (item.advogados ?? []).forEach((a) => {
+  (item.advogados ?? []).forEach((a: { oab?: string }) => {
     const n = normalizarOab(a.oab);
     if (n) oabsPublicacao.add(n);
   });
