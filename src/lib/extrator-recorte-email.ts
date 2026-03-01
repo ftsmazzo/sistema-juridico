@@ -71,19 +71,42 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
   );
 
   const rePub = /Publicação:\s*(\d+)\s*\./gi;
-  const blocos: { num: number; start: number }[] = [];
+  let blocos: { num: number; start: number }[] = [];
   let m: RegExpExecArray | null;
   while ((m = rePub.exec(raw)) !== null) {
     blocos.push({ num: parseInt(m[1], 10), start: m.index });
   }
 
+  if (blocos.length <= 1) {
+    const rePubPermissivo = /Publicação\s*:\s*(\d+)/gi;
+    blocos = [];
+    while ((m = rePubPermissivo.exec(raw)) !== null) {
+      blocos.push({ num: parseInt(m[1], 10), start: m.index });
+    }
+  }
+
+  if (blocos.length <= 1 && /Data de Disponibilização/.test(raw)) {
+    const reDataDisp = /Data de Disponibilização:\s*(\d{2}\/\d{2}\/\d{4})/gi;
+    const dataMatches: { num: number; start: number }[] = [];
+    let idx = 0;
+    while ((m = reDataDisp.exec(raw)) !== null) {
+      idx++;
+      dataMatches.push({ num: idx, start: m.index });
+    }
+    if (dataMatches.length > 1) {
+      blocos = dataMatches;
+    }
+  }
+
   if (blocos.length === 0) {
     if (/Data de Disponibilização/.test(raw) && /PROCESSO:\s*\d{7}/.test(raw)) {
-      blocos.push({ num: 1, start: 0 });
+      blocos = [{ num: 1, start: 0 }];
     } else {
       return [];
     }
   }
+
+  blocos = blocos.sort((a, b) => a.start - b.start);
 
   const saida: ItemPublicacaoOab[] = [];
 
