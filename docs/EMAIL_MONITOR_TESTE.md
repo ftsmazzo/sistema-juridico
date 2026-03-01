@@ -78,8 +78,9 @@ Se houver erros em alguma publicação (ex.: IA falhou, publicação duplicada):
 
 ### Configuração
 
-- **OPENAI_API_KEY** ou **ANTHROPIC_API_KEY**: pelo menos uma para o enriquecimento por IA.
-- Modelos (opcional): **OPENAI_VISION_MODEL** (padrão `gpt-4o`), **CLAUDE_VISION_MODEL** (padrão `claude-sonnet-4-20250514`). O enriquecimento usa chamada **texto** (não imagem); os mesmos modelos funcionam.
+- **ANTHROPIC_API_KEY** (recomendado para igualar à automação): chave da API Anthropic. Com ela, o teste usa **Claude** e por padrão o modelo **Claude Sonnet 4.6** (`claude-sonnet-4-6`), o mesmo da automação.
+- **EMAIL_IA_MODEL** (opcional): modelo a usar; padrão `claude-sonnet-4-6`. Ex.: `EMAIL_IA_MODEL=claude-sonnet-4-6`.
+- Se não houver ANTHROPIC_API_KEY, usa-se OPENAI_API_KEY e OPENAI_VISION_MODEL (ex.: gpt-4o). A qualidade costuma ficar abaixo da automação com Claude.
 
 ### Exemplo com curl (após login)
 

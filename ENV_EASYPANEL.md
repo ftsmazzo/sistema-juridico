@@ -16,7 +16,8 @@ Use estas variáveis no painel do EasyPanel em **Variables** (ou **Environment**
 | `OPENAI_API_KEY` | Não (cadastro por print) | `sk-...` | Chave da API OpenAI para extração por print. Configure **uma** das duas (OpenAI ou Anthropic). |
 | `OPENAI_VISION_MODEL` | Não | `gpt-4o` | Modelo OpenAI na extração (padrão: gpt-4o). |
 | `ANTHROPIC_API_KEY` | Não (cadastro por print) | `sk-ant-api03-...` | Chave da API Anthropic (Claude) para extração por print. Configure **uma** das duas (OpenAI ou Anthropic). |
-| `CLAUDE_VISION_MODEL` | Não | `claude-sonnet-4-20250514` | Modelo Claude na extração (padrão: claude-sonnet-4-20250514). |
+| `CLAUDE_VISION_MODEL` | Não | `claude-sonnet-4-20250514` | Modelo Claude na extração por print (padrão: claude-sonnet-4-20250514). |
+| `EMAIL_IA_MODEL` | Não | `claude-sonnet-4-6` | Modelo usado no **teste de e-mail Recorte** (Publicações → Testar e-mail). Para igualar à automação N8N com Claude Sonnet 4.6, defina `ANTHROPIC_API_KEY` e opcionalmente `EMAIL_IA_MODEL=claude-sonnet-4-6`. |
 | `PUBLICACOES_PRINT_PROMPT` | Não | — | Prompt customizado para a IA (sobrescreve o padrão). Útil para usar o mesmo prompt do N8N. |
 | `ESCAVADOR_API_KEY` ou `ESCAVADOR_TOKEN` | Não (sincronizar Escavador) | `eyJ0eXAi...` (Bearer token) | Token da API Escavador para **POST /api/dados-escavador/sincronizar**. Obtenha em [api.escavador.com/tokens](https://api.escavador.com/tokens). **Importante:** defina como variável de **runtime** do serviço da API (não só Build Args). Cole o token sem espaços ou quebras de linha. Se aparecer 401 Unauthenticated, confira que a variável está nas env do **container** (não do build) e reinicie o serviço. |
 | CORS | — | — | A API usa o middleware `cors()` e aceita requisições de qualquer origem, para o frontend em outro domínio (EasyPanel) funcionar. |

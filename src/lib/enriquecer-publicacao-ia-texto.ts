@@ -3,7 +3,8 @@
  * Usa o mesmo prompt do N8N (docs/n8n-prompt-ia-publicacoes.txt) para preservar
  * a qualidade da resposta da automação (melhor que a IA do print por imagem).
  *
- * Variáveis de ambiente: OPENAI_API_KEY ou ANTHROPIC_API_KEY.
+ * Para igualar à automação: use Claude (ANTHROPIC_API_KEY) e modelo Claude Sonnet 4.6.
+ * Variáveis: ANTHROPIC_API_KEY (recomendado) ou OPENAI_API_KEY; EMAIL_IA_MODEL (ex.: claude-sonnet-4-6).
  */
 import OpenAI from "openai";
 import type { ItemPublicacaoOab } from "./publicacoes-oab.types.js";
@@ -120,7 +121,7 @@ async function enriquecerComClaude(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -144,20 +145,22 @@ export type OpcoesEnriquecer = {
 
 /**
  * Enriquece um item de publicação com resumo, baseLegal, prazoDiasUteisSugerido, observacoesIa, movimentacoes.
- * Usa o mesmo prompt do N8N (análise por texto) para manter a qualidade da automação.
+ * Usa o mesmo prompt do N8N. Prioriza Claude (como na automação) e Claude Sonnet 4.6 por padrão.
  */
 export async function enriquecerPublicacaoComIaTexto(
   item: ItemPublicacaoOab,
   opcoes?: OpcoesEnriquecer
 ): Promise<EnriquecimentoIa> {
   const prompt = buildPrompt(item);
+  // Priorizar Claude quando disponível (mesmo que na automação N8N)
   const provider =
     opcoes?.provider ??
-    (process.env.OPENAI_API_KEY ? "openai" : "claude");
+    (process.env.ANTHROPIC_API_KEY ? "claude" : "openai");
   const model =
     opcoes?.model ??
+    process.env.EMAIL_IA_MODEL ??
     (provider === "claude"
-      ? process.env.CLAUDE_VISION_MODEL ?? "claude-sonnet-4-20250514"
+      ? process.env.CLAUDE_VISION_MODEL ?? "claude-sonnet-4-6"
       : process.env.OPENAI_VISION_MODEL ?? "gpt-4o");
 
   if (provider === "claude") {
