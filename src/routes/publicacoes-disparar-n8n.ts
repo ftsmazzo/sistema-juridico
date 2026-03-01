@@ -36,8 +36,9 @@ function extrairAnaliseDaRespostaN8n(body: unknown): AnalisePayload | null {
   if (!Array.isArray(content) || content.length === 0) return null;
   const textBlock = content[0];
   if (textBlock?.type !== "text" || typeof textBlock.text !== "string") return null;
-  const raw = textBlock.text.trim();
+  let raw = textBlock.text.trim();
   if (!raw) return null;
+  raw = raw.replace(/^```json?\s*|\s*```$/g, "").trim();
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {

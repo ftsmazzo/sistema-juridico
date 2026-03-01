@@ -28,7 +28,7 @@ O sistema espera um **array** com um objeto que tenha `content` (array), e o pri
 ]
 ```
 
-O campo `text` deve ser um **objeto JSON em string** com as chaves:
+O campo `text` deve ser um **objeto JSON em string** com as chaves abaixo. O sistema aceita o JSON **com ou sem** o wrapper em markdown (por exemplo `` ```json ... ``` ``); se vier envolvido, o wrapper é removido antes de parsear.
 
 - `resumo` (string)
 - `baseLegal` (string; será truncado a 255 caracteres)
