@@ -52,6 +52,7 @@ import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
 import { startEmailMonitorScheduler } from "./lib/email-monitor-scheduler.js";
 import { requireAuth } from "./middleware/auth.js";
+import { backfillPrazosUsuarios } from "./lib/processar-publicacao-oab.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -128,6 +129,11 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`API rodando em http://localhost:${PORT}`);
     startEmailMonitorScheduler();
+    backfillPrazosUsuarios()
+      .then((r) => {
+        if (r.vinculosInseridos > 0) console.log(`Backfill calendário: ${r.vinculosInseridos} vínculos para ${r.prazosProcessados} prazos`);
+      })
+      .catch((err) => console.warn("Backfill prazos_usuarios:", err));
   });
 }
 
