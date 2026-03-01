@@ -10,6 +10,7 @@
 import { Response } from "express";
 import type { RequestWithUser } from "../middleware/auth.js";
 import { executarAnaliseN8nParaPublicacao } from "../lib/analise-n8n-publicacao.js";
+import { enviarNotificacaoPublicacao } from "../lib/notifica-publicacao.js";
 
 export async function dispararAnaliseN8n(
   req: RequestWithUser,
@@ -41,6 +42,7 @@ export async function dispararAnaliseN8n(
     return;
   }
   if (result.analiseGravada) {
+    enviarNotificacaoPublicacao(id, result.prazosCriados).catch(() => {});
     res.json({ ok: true, message: "Análise recebida e gravada na publicação." });
     return;
   }

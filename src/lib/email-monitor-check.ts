@@ -11,6 +11,7 @@ import { fetchRecentEmails } from "./email-monitor-imap.js";
 import { extrairPublicacoesDeEmail } from "./extrator-recorte-email.js";
 import { processarItemPublicacaoOab } from "./processar-publicacao-oab.js";
 import { executarAnaliseN8nParaPublicacao } from "./analise-n8n-publicacao.js";
+import { enviarNotificacaoPublicacao, enviarNotificacaoAgrupada } from "./notifica-publicacao.js";
 
 export type CheckResult = {
   ok: boolean;
@@ -82,6 +83,8 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
 
     let publicacoesCriadas = 0;
     let prazosCriados = 0;
+    /** Publicações que tiveram análise IA gravada nesta run (para notificação única ou agrupada). */
+    const notificarPublicacoes: { publicacaoId: number; prazosCriados: number }[] = [];
 
     for (const email of emails) {
       const itens = extrairPublicacoesDeEmail({
@@ -99,14 +102,29 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
           if (result.prazoIds?.length) prazosCriados += result.prazoIds.length;
           if (!result.skipped && process.env.WEBHOOK_N8N_ANALISE_PUBLICACAO_URL?.trim()) {
             const analiseResult = await executarAnaliseN8nParaPublicacao(result.publicacaoId);
-            if (analiseResult.analiseGravada && analiseResult.prazosCriados > 0) {
+            if (analiseResult.analiseGravada) {
               prazosCriados += analiseResult.prazosCriados;
+              notificarPublicacoes.push({
+                publicacaoId: result.publicacaoId,
+                prazosCriados: analiseResult.prazosCriados,
+              });
             }
             if (!analiseResult.ok && analiseResult.erro) {
               console.error(`IA publicação ${result.publicacaoId}:`, analiseResult.erro);
             }
           }
         }
+      }
+    }
+
+    if (notificarPublicacoes.length > 0 && process.env.WEBHOOK_N8N_NOTIFICA?.trim()) {
+      if (notificarPublicacoes.length === 1) {
+        enviarNotificacaoPublicacao(
+          notificarPublicacoes[0].publicacaoId,
+          notificarPublicacoes[0].prazosCriados
+        ).catch(() => {});
+      } else {
+        enviarNotificacaoAgrupada(notificarPublicacoes).catch(() => {});
       }
     }
 
