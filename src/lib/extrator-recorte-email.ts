@@ -60,9 +60,10 @@ export type EmailPayload = {
  * Retorna array de ItemPublicacaoOab (um por publicação); vazio se não for Recorte.
  */
 export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacaoOab[] {
-  const raw = normalizeText(
-    payload.emailText || payload.emailHtml || ""
-  );
+  const textNorm = normalizeText(payload.emailText || "");
+  const htmlNorm = normalizeText(payload.emailHtml || "");
+  const raw =
+    textNorm.length >= htmlNorm.length ? textNorm : htmlNorm || textNorm;
   if (!raw) return [];
 
   const subject = payload.subject || "";
@@ -99,8 +100,8 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
     }
   }
 
-  if (blocos.length <= 1 && /Data\s+(de|da)\s+Disponibilização/i.test(raw)) {
-    const reDataDisp = /Data\s+(?:de|da)\s+Disponibilização:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/gi;
+  if (blocos.length <= 1 && /Data\s+(de|da)\s+Disponibiliza[cç]ão/i.test(raw)) {
+    const reDataDisp = /Data\s+(?:de|da)\s+Disponibiliza[cç]ão:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/gi;
     const dataMatches: { num: number; start: number }[] = [];
     let idx = 0;
     while ((m = reDataDisp.exec(raw)) !== null) {
@@ -113,7 +114,7 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
   }
 
   if (blocos.length === 0) {
-    if (/Data\s+(de|da)\s+Disponibilização/i.test(raw) && /PROCESSO:\s*\d{7}/.test(raw)) {
+    if (/Data\s+(de|da)\s+Disponibiliza[cç]ão/i.test(raw) && /PROCESSO:\s*\d{7}/.test(raw)) {
       blocos = [{ num: 1, start: 0 }];
     } else {
       return [];
@@ -132,13 +133,31 @@ export function extrairPublicacoesDeEmail(payload: EmailPayload): ItemPublicacao
     if (totalIdx >= 0) t = t.slice(0, totalIdx).trim();
 
     const dataDispRaw =
-      pick(/Data\s+de\s+Disponibilização:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
-      pick(/Data\s+da\s+Disponibilização:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t);
+      pick(/Data\s+de\s+Disponibiliza[cç]ão:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
+      pick(/Data\s+da\s+Disponibiliza[cç]ão:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
+      pick(/Disponibiliza[cç]ão\s*:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t);
     const dataPubRaw =
-      pick(/Data\s+de\s+Publicação:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
-      pick(/Data\s+da\s+Publicação:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t);
-    const dataDisp = dataDispRaw ? normalizarData(dataDispRaw) : "";
-    const dataPub = dataPubRaw ? normalizarData(dataPubRaw) : "";
+      pick(/Data\s+de\s+Publica[cç]ão:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
+      pick(/Data\s+da\s+Publica[cç]ão:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t) ||
+      pick(/Data\s+de\s+Publica[cç]ão\s*:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i, t);
+    let dataDisp = dataDispRaw ? normalizarData(dataDispRaw) : "";
+    let dataPub = dataPubRaw ? normalizarData(dataPubRaw) : "";
+    if (!dataDisp || !dataPub) {
+      const todasDatas: string[] = [];
+      const reData = /\b(\d{1,2}\/\d{1,2}\/\d{2,4})\b/g;
+      let dm: RegExpExecArray | null;
+      while ((dm = reData.exec(t)) !== null) {
+        const d = normalizarData(dm[1]);
+        if (d && !todasDatas.includes(d)) todasDatas.push(d);
+      }
+      if (todasDatas.length >= 2 && (!dataDisp || !dataPub)) {
+        if (!dataDisp) dataDisp = todasDatas[0];
+        if (!dataPub) dataPub = todasDatas[todasDatas.length - 1] ?? todasDatas[0];
+      } else if (todasDatas.length >= 1 && !dataDisp && !dataPub) {
+        dataDisp = todasDatas[0];
+        dataPub = todasDatas[0];
+      }
+    }
     const jornal = norm(pick(/Jornal:\s*([^\n]+?)(?=\s*Página:|$)/i, t));
     const pagina = pick(/Página:\s*(\d+)/i, t);
     const caderno = norm(pick(/Caderno:\s*([^\n]+?)(?=\s*Local:|$)/i, t));
