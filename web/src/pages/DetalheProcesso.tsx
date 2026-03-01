@@ -13,12 +13,31 @@ import {
 
 function formatarData(iso: string | null | undefined) {
   if (!iso) return "—";
-  const s = typeof iso === "string" ? iso : String(iso);
-  return new Date(s).toLocaleDateString("pt-BR", {
+  const s = typeof iso === "string" ? iso.trim() : String(iso).trim();
+  if (!s) return "—";
+  const d = parseData(s);
+  if (!d || isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
+}
+
+/** Aceita ISO (YYYY-MM-DD) ou DD/MM/YYYY. */
+function parseData(s: string): Date | null {
+  if (!s) return null;
+  const parts = s.split(/[/-]/);
+  if (parts.length === 3) {
+    const [a, b, c] = parts.map((p) => parseInt(p.replace(/\D/g, ""), 10));
+    if (s.includes("/") && a <= 31 && b <= 12) {
+      return new Date(c, b - 1, a);
+    }
+    if (a >= 1000) return new Date(a, b - 1, c);
+    if (c >= 1000) return new Date(c, b - 1, a);
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 function Campo({
@@ -530,9 +549,7 @@ export function DetalheProcesso() {
           <h3 className="mb-4 font-semibold text-foreground">Prazos e publicações</h3>
           <div className="space-y-6">
             <div>
-              <p className="mb-2 text-sm font-medium text-foreground">
-                Prazos vinculados ({prazosVinculados.length})
-              </p>
+              <p className="mb-2 text-sm font-medium text-foreground">Prazos vinculados</p>
               {prazosVinculados.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum prazo vinculado.</p>
               ) : (
@@ -547,9 +564,7 @@ export function DetalheProcesso() {
               )}
             </div>
             <div>
-              <p className="mb-2 text-sm font-medium text-foreground">
-                Publicações vinculadas ({publicacoesVinculadas.length})
-              </p>
+              <p className="mb-2 text-sm font-medium text-foreground">Publicações vinculadas</p>
               {publicacoesVinculadas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma publicação vinculada.</p>
               ) : (
@@ -561,7 +576,9 @@ export function DetalheProcesso() {
                         className="block rounded border border-border/60 bg-muted/20 px-3 py-2 text-primary hover:underline"
                       >
                         {pub.tipoPublicacao ?? pub.subject ?? `Publicação #${pub.id}`}
-                        {pub.dataPublicacao ? ` · ${formatarData(pub.dataPublicacao)}` : ""}
+                        {formatarData(pub.dataPublicacao) !== "—"
+                          ? ` · ${formatarData(pub.dataPublicacao)}`
+                          : ""}
                       </Link>
                     </li>
                   ))}
