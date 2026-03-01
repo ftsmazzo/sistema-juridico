@@ -86,11 +86,15 @@ export async function fetchRecentEmails(
         const parsed = await simpleParser(raw);
         const text = parsed.text ?? "";
         const html = parsed.html ?? "";
+        const fromObj = Array.isArray(parsed.from) ? parsed.from[0] : parsed.from;
+        const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
+        const messageId =
+          typeof parsed.messageId === "string" ? parsed.messageId : `uid-${msg.uid}`;
         results.push({
-          messageId: parsed.messageId ?? `uid-${msg.uid}`,
+          messageId,
           subject: parsed.subject ?? "",
-          from: parsed.from?.text ?? fromAddr,
-          to: parsed.to?.text ?? "",
+          from: (fromObj as { text?: string } | undefined)?.text ?? fromAddr,
+          to: (toObj as { text?: string } | undefined)?.text ?? "",
           date: parsed.date ?? new Date(),
           text,
           html,
