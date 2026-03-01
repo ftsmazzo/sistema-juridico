@@ -249,6 +249,25 @@ export const dadosEscavador = pgTable(
   ]
 );
 
+// --- Conta de e-mail para monitoramento (IMAP: Yahoo, OAB, etc.) ---
+// Uma conta por sistema; verificação automática a cada interval_minutes; extração cria só publicações; análise IA fica no N8N (botão).
+export const contaEmailMonitoramento = pgTable("conta_email_monitoramento", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull().default("Conta principal"),
+  host: varchar("host", { length: 255 }).notNull(),
+  port: integer("port").notNull().default(993),
+  secure: boolean("secure").notNull().default(true),
+  user: varchar("user", { length: 255 }).notNull(),
+  passwordEncrypted: text("password_encrypted"),
+  remetentesFiltro: jsonb("remetentes_filtro").$type<string[]>().default([]),
+  intervalMinutes: integer("interval_minutes").notNull().default(15),
+  lastCheckedAt: timestamp("last_checked_at"),
+  lastError: text("last_error"),
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // --- Publicações OAB (Recorte Digital) ---
 export const publicacoesOab = pgTable(
   "publicacoes_oab",

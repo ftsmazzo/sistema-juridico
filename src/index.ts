@@ -35,8 +35,14 @@ import {
 } from "./routes/dados-escavador.js";
 import { limparDados } from "./routes/admin/limpar-dados.js";
 import { emailMonitorTest } from "./routes/email-monitor-test.js";
+import {
+  getEmailMonitorConfig,
+  putEmailMonitorConfig,
+  postVerificarAgora,
+} from "./routes/email-monitor-config.js";
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
+import { startEmailMonitorScheduler } from "./lib/email-monitor-scheduler.js";
 import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
@@ -87,6 +93,9 @@ app.post("/api/dados-escavador/sincronizar", requireAuth, sincronizarDadosEscava
 app.post("/api/admin/limpar-dados", requireAuth, limparDados);
 
 app.post("/api/email-monitor/test", requireAuth, emailMonitorTest);
+app.get("/api/email-monitor/config", requireAuth, getEmailMonitorConfig);
+app.put("/api/email-monitor/config", requireAuth, putEmailMonitorConfig);
+app.post("/api/email-monitor/verificar-agora", requireAuth, postVerificarAgora);
 
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
@@ -99,6 +108,7 @@ async function start() {
   }
   app.listen(PORT, () => {
     console.log(`API rodando em http://localhost:${PORT}`);
+    startEmailMonitorScheduler();
   });
 }
 

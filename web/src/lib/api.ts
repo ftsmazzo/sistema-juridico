@@ -203,6 +203,40 @@ export function dispararAnaliseN8n(id: number) {
   );
 }
 
+/** Configuração do monitoramento de e-mail (IMAP). */
+export type EmailMonitorConfig = {
+  id: number;
+  nome: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  remetentesFiltro: string[];
+  intervalMinutes: number;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  ativo: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function getEmailMonitorConfig() {
+  return api.get<EmailMonitorConfig>("/api/email-monitor/config");
+}
+
+export function putEmailMonitorConfig(body: Partial<EmailMonitorConfig> & { password?: string }) {
+  return api.put<EmailMonitorConfig>("/api/email-monitor/config", body);
+}
+
+export function postVerificarAgora() {
+  return api.post<{
+    ok: boolean;
+    publicacoesCriadas: number;
+    prazosCriados: number;
+    emailsProcessados: number;
+  }>("/api/email-monitor/verificar-agora");
+}
+
 /** Cadastra publicação(ões) a partir de imagem (print). Extração por IA no backend. */
 export type PublicacaoPorPrintResponse = {
   publicacaoId: number;

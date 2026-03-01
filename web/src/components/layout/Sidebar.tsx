@@ -4,12 +4,14 @@ import { DashboardIcon } from "@/components/icons/DashboardIcon";
 import { DocumentIcon } from "@/components/icons/DocumentIcon";
 import { UsersIcon } from "@/components/icons/UsersIcon";
 import { SettingsIcon } from "@/components/icons/SettingsIcon";
+import { MailIcon } from "@/components/icons/MailIcon";
 import { podeVerUsuarios, isGestor } from "@/lib/auth";
 
 const baseNav = [
   { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
   { to: "/prazos", label: "Prazos", Icon: CalendarIcon },
   { to: "/publicacoes", label: "Publicações", Icon: DocumentIcon },
+  { to: "/monitoramento-email", label: "Monitoramento de e-mail", Icon: MailIcon },
   { to: "/processos", label: "Processos", Icon: DocumentIcon },
 ];
 
