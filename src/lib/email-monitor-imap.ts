@@ -88,8 +88,8 @@ export async function fetchRecentEmails(
         if (msg.source == null) continue;
         const raw = await streamToBuffer(msg.source);
         const parsed = await simpleParser(raw);
-        const text = parsed.text ?? "";
-        const html = parsed.html ?? "";
+        const text = asString(parsed.text);
+        const html = asString(parsed.html);
         const fromObj = Array.isArray(parsed.from) ? parsed.from[0] : parsed.from;
         const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
         const messageId =
