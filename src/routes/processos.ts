@@ -5,10 +5,12 @@ import {
   clientes,
   usuarios,
   movimentacoesProcesso,
+  movimentacoes as movimentacoesPub,
   prazos,
   publicacoesOab,
+  dadosEscavador,
 } from "../db/schema.js";
-import { eq, ilike, and, or, asc, desc, sql, lt, lte, gt, isNull } from "drizzle-orm";
+import { eq, ilike, and, or, asc, desc, sql, lt, lte, gt, isNull, inArray } from "drizzle-orm";
 import type { RequestWithUser } from "../middleware/auth.js";
 import { podeCadastrarPessoas } from "../lib/roles.js";
 
@@ -190,6 +192,64 @@ export async function getProcessoById(
       .where(eq(movimentacoesProcesso.idProcesso, id))
       .orderBy(asc(movimentacoesProcesso.ordem), asc(movimentacoesProcesso.id));
     const numeroCnjNorm = (proc.numeroCnj ?? "").trim();
+
+    const wherePubProcesso = numeroCnjNorm
+      ? or(
+          eq(publicacoesOab.processoId, id),
+          sql`trim(coalesce(${publicacoesOab.numeroProcesso}, '')) = ${numeroCnjNorm}`
+        )
+      : eq(publicacoesOab.processoId, id);
+    const publicacoesDesteProcesso = await db
+      .select({ id: publicacoesOab.id })
+      .from(publicacoesOab)
+      .where(wherePubProcesso);
+    const pubIds = publicacoesDesteProcesso.map((r) => r.id);
+    const movimentacoesFromPublicacoes =
+      pubIds.length > 0
+        ? await db
+            .select({
+              id: movimentacoesPub.id,
+              tipo: movimentacoesPub.tipo,
+              resumo: movimentacoesPub.resumo,
+              ordem: movimentacoesPub.ordem,
+              fonte: movimentacoesPub.fonte,
+              dataLimite: movimentacoesPub.dataLimite,
+              publicacaoOabId: movimentacoesPub.publicacaoOabId,
+            })
+            .from(movimentacoesPub)
+            .where(inArray(movimentacoesPub.publicacaoOabId, pubIds))
+            .orderBy(asc(movimentacoesPub.ordem), asc(movimentacoesPub.id))
+        : [];
+
+    const prazosVinculados = await db
+      .select({
+        id: prazos.id,
+        prazo: prazos.prazo,
+        data: prazos.data,
+        status: prazos.status,
+      })
+      .from(prazos)
+      .where(
+        numeroCnjNorm
+          ? or(
+              eq(prazos.processoId, id),
+              sql`trim(coalesce(${prazos.numeroProcesso}, '')) = ${numeroCnjNorm}`
+            )
+          : eq(prazos.processoId, id)
+      )
+      .orderBy(prazos.data, prazos.prazo);
+
+    const publicacoesVinculadas = await db
+      .select({
+        id: publicacoesOab.id,
+        subject: publicacoesOab.subject,
+        tipoPublicacao: publicacoesOab.tipoPublicacao,
+        dataPublicacao: publicacoesOab.dataPublicacao,
+      })
+      .from(publicacoesOab)
+      .where(wherePubProcesso)
+      .orderBy(desc(publicacoesOab.createdAt));
+
     const [{ count: countPrazos }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(prazos)
@@ -219,6 +279,27 @@ export async function getProcessoById(
         ? { ...advogado, nomeCompleto: `${advogado.nome || ""} ${advogado.sobrenome || ""}`.trim() }
         : null,
       movimentacoes,
+      movimentacoesFromPublicacoes: movimentacoesFromPublicacoes.map((m) => ({
+        id: m.id,
+        tipo: m.tipo,
+        resumo: m.resumo,
+        ordem: m.ordem,
+        fonte: m.fonte,
+        dataLimite: m.dataLimite ? String(m.dataLimite) : null,
+        publicacaoOabId: m.publicacaoOabId,
+      })),
+      prazosVinculados: prazosVinculados.map((p) => ({
+        id: p.id,
+        prazo: p.prazo,
+        data: String(p.data),
+        status: p.status,
+      })),
+      publicacoesVinculadas: publicacoesVinculadas.map((p) => ({
+        id: p.id,
+        subject: p.subject,
+        tipoPublicacao: p.tipoPublicacao,
+        dataPublicacao: p.dataPublicacao,
+      })),
       totalPrazos: countPrazos ?? 0,
       totalPublicacoes: countPublicacoes ?? 0,
     });
@@ -344,6 +425,142 @@ export async function updateProcesso(
   } catch (err) {
     console.error("Update processo:", err);
     res.status(500).json({ error: "Erro ao atualizar processo" });
+  }
+}
+
+/** POST: popula movimentações do processo a partir das publicações OAB (IA/e-mail) vinculadas. */
+export async function popularMovimentacoesPublicacoes(
+  req: RequestWithUser,
+  res: Response<{ inseridas: number; message: string } | { error: string }>
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    const [proc] = await db.select().from(processos).where(eq(processos.id, id)).limit(1);
+    if (!proc) {
+      res.status(404).json({ error: "Processo não encontrado" });
+      return;
+    }
+    const numeroCnjNorm = (proc.numeroCnj ?? "").trim();
+    const wherePub = numeroCnjNorm
+      ? or(
+          eq(publicacoesOab.processoId, id),
+          sql`trim(coalesce(${publicacoesOab.numeroProcesso}, '')) = ${numeroCnjNorm}`
+        )
+      : eq(publicacoesOab.processoId, id);
+    const pubs = await db.select({ id: publicacoesOab.id }).from(publicacoesOab).where(wherePub);
+    const pubIds = pubs.map((r) => r.id);
+    if (pubIds.length === 0) {
+      res.json({ inseridas: 0, message: "Nenhuma publicação vinculada a este processo." });
+      return;
+    }
+    const movs = await db
+      .select({
+        tipo: movimentacoesPub.tipo,
+        resumo: movimentacoesPub.resumo,
+        ordem: movimentacoesPub.ordem,
+        dataLimite: movimentacoesPub.dataLimite,
+      })
+      .from(movimentacoesPub)
+      .where(inArray(movimentacoesPub.publicacaoOabId, pubIds))
+      .orderBy(asc(movimentacoesPub.ordem), asc(movimentacoesPub.id));
+
+    const maxOrdResult = await db
+      .select({ ordem: movimentacoesProcesso.ordem })
+      .from(movimentacoesProcesso)
+      .where(eq(movimentacoesProcesso.idProcesso, id))
+      .orderBy(desc(movimentacoesProcesso.ordem))
+      .limit(1);
+    let ordem = (maxOrdResult[0]?.ordem ?? 0) + 1;
+    let inseridas = 0;
+    for (const m of movs) {
+      const texto = [m.tipo, m.resumo].filter(Boolean).join(": ");
+      await db.insert(movimentacoesProcesso).values({
+        idProcesso: id,
+        ordem: ordem++,
+        movimentacao: texto || m.tipo || null,
+        dataMovimentacao: m.dataLimite ?? null,
+      });
+      inseridas++;
+    }
+    res.json({
+      inseridas,
+      message: `${inseridas} movimentação(ões) adicionada(s) a partir das publicações.`,
+    });
+  } catch (err) {
+    console.error("Popular movimentações publicações:", err);
+    res.status(500).json({ error: "Erro ao popular movimentações a partir das publicações." });
+  }
+}
+
+/** POST: adiciona uma movimentação ao processo a partir do cache Escavador (data_ultima_movimentacao). */
+export async function popularMovimentacoesEscavador(
+  req: RequestWithUser,
+  res: Response<{ inseridas: number; message: string } | { error: string }>
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    const [proc] = await db.select().from(processos).where(eq(processos.id, id)).limit(1);
+    if (!proc) {
+      res.status(404).json({ error: "Processo não encontrado" });
+      return;
+    }
+    const numeroCnj = (proc.numeroCnj ?? "").trim();
+    if (!numeroCnj) {
+      res.json({ inseridas: 0, message: "Processo sem número CNJ." });
+      return;
+    }
+    const rows = await db
+      .select({
+        dataUltimaMovimentacao: dadosEscavador.dataUltimaMovimentacao,
+      })
+      .from(dadosEscavador)
+      .where(eq(dadosEscavador.numeroCnj, numeroCnj))
+      .orderBy(desc(dadosEscavador.dataUltimaMovimentacao))
+      .limit(1);
+    const row = rows[0];
+    if (!row?.dataUltimaMovimentacao) {
+      res.json({
+        inseridas: 0,
+        message: "Nenhum dado do Escavador para este processo. Sincronize por OAB em Dados Escavador.",
+      });
+      return;
+    }
+    const maxOrdResult = await db
+      .select({ ordem: movimentacoesProcesso.ordem })
+      .from(movimentacoesProcesso)
+      .where(eq(movimentacoesProcesso.idProcesso, id))
+      .orderBy(desc(movimentacoesProcesso.ordem))
+      .limit(1);
+    const ordem = (maxOrdResult[0]?.ordem ?? 0) + 1;
+    await db.insert(movimentacoesProcesso).values({
+      idProcesso: id,
+      ordem,
+      movimentacao: "Última movimentação (Escavador)",
+      dataMovimentacao: row.dataUltimaMovimentacao,
+    });
+    res.json({
+      inseridas: 1,
+      message: "Uma movimentação adicionada a partir do Escavador.",
+    });
+  } catch (err) {
+    console.error("Popular movimentações Escavador:", err);
+    res.status(500).json({ error: "Erro ao popular movimentações do Escavador." });
   }
 }
 

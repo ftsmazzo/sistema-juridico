@@ -26,6 +26,8 @@ import {
   createProcesso,
   updateProcesso,
   enriquecerProcessosComEscavador,
+  popularMovimentacoesPublicacoes,
+  popularMovimentacoesEscavador,
 } from "./routes/processos.js";
 import { importarExcelProcessos } from "./routes/processos-importar.js";
 import {
@@ -82,6 +84,8 @@ app.patch("/api/clientes/:id", requireAuth, updateCliente);
 app.get("/api/processos", requireAuth, listProcessos);
 app.post("/api/processos/enriquecer-escavador", requireAuth, enriquecerProcessosComEscavador);
 app.get("/api/processos/:id", requireAuth, getProcessoById);
+app.post("/api/processos/:id/popular-movimentacoes-publicacoes", requireAuth, popularMovimentacoesPublicacoes);
+app.post("/api/processos/:id/popular-movimentacoes-escavador", requireAuth, popularMovimentacoesEscavador);
 app.post("/api/processos", requireAuth, createProcesso);
 app.patch("/api/processos/:id", requireAuth, updateProcesso);
 app.post("/api/processos/importar-excel", requireAuth, importarExcelProcessos);

@@ -6,6 +6,8 @@ import {
   getClientes,
   getUsuarios,
   updateProcesso,
+  popularMovimentacoesPublicacoes,
+  popularMovimentacoesEscavador,
   type ProcessoDetalhe,
 } from "@/lib/api";
 
@@ -68,6 +70,19 @@ export function DetalheProcesso() {
       queryClient.invalidateQueries({ queryKey: ["processos"] });
       setEditando(false);
       setForm({});
+    },
+  });
+
+  const mutationPopPub = useMutation({
+    mutationFn: () => popularMovimentacoesPublicacoes(procId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["processo", procId] });
+    },
+  });
+  const mutationPopEsc = useMutation({
+    mutationFn: () => popularMovimentacoesEscavador(procId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["processo", procId] });
     },
   });
 
@@ -141,6 +156,22 @@ export function DetalheProcesso() {
     ordem: number;
     movimentacao: string | null;
     dataMovimentacao: string | null;
+  }[];
+  const movimentacoesFromPublicacoes = (p.movimentacoesFromPublicacoes || []) as {
+    id: number;
+    tipo: string;
+    resumo: string | null;
+    ordem: number;
+    fonte: string;
+    dataLimite: string | null;
+    publicacaoOabId: number;
+  }[];
+  const prazosVinculados = (p.prazosVinculados || []) as { id: number; prazo: string; data: string; status: number }[];
+  const publicacoesVinculadas = (p.publicacoesVinculadas || []) as {
+    id: number;
+    subject: string | null;
+    tipoPublicacao: string | null;
+    dataPublicacao: string | null;
   }[];
   const tabs = [
     { id: "dados" as const, label: "Dados do processo" },
@@ -411,6 +442,29 @@ export function DetalheProcesso() {
       {aba === "movimentacoes" && (
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="mb-4 font-semibold text-foreground">Histórico de movimentações</h3>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => mutationPopEsc.mutate()}
+              disabled={mutationPopEsc.isPending}
+              className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {mutationPopEsc.isPending ? "…" : "Escavador"}
+            </button>
+            <button
+              type="button"
+              onClick={() => mutationPopPub.mutate()}
+              disabled={mutationPopPub.isPending}
+              className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {mutationPopPub.isPending ? "…" : "Publicação"}
+            </button>
+            {(mutationPopPub.data?.message || mutationPopEsc.data?.message) && (
+              <span className="text-sm text-muted-foreground">
+                {mutationPopPub.data?.message || mutationPopEsc.data?.message}
+              </span>
+            )}
+          </div>
           {(p.dataUltimaMovimentacao != null && String(p.dataUltimaMovimentacao).trim() !== "") && (
             <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -424,7 +478,7 @@ export function DetalheProcesso() {
               </p>
             </div>
           )}
-          {movimentacoes.length === 0 ? (
+          {movimentacoes.length === 0 && movimentacoesFromPublicacoes.length === 0 ? (
             <p className="text-muted-foreground">Nenhuma movimentação registrada.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -434,16 +488,34 @@ export function DetalheProcesso() {
                     <th className="px-4 py-2 font-medium text-foreground">Ordem</th>
                     <th className="px-4 py-2 font-medium text-foreground">Data</th>
                     <th className="px-4 py-2 font-medium text-foreground">Movimentação</th>
+                    <th className="px-4 py-2 font-medium text-foreground">Fonte</th>
                   </tr>
                 </thead>
                 <tbody>
                   {movimentacoes.map((m) => (
-                    <tr key={m.id} className="border-b border-border/60">
+                    <tr key={`proc-${m.id}`} className="border-b border-border/60">
                       <td className="px-4 py-2 text-muted-foreground">{m.ordem}</td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {formatarData(m.dataMovimentacao)}
                       </td>
                       <td className="px-4 py-2 text-foreground">{m.movimentacao ?? "—"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">Processo</td>
+                    </tr>
+                  ))}
+                  {movimentacoesFromPublicacoes.map((m) => (
+                    <tr key={`pub-${m.id}`} className="border-b border-border/60">
+                      <td className="px-4 py-2 text-muted-foreground">{m.ordem}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {formatarData(m.dataLimite)}
+                      </td>
+                      <td className="px-4 py-2 text-foreground">
+                        {[m.tipo, m.resumo].filter(Boolean).join(": ") || m.tipo || "—"}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
+                          {m.fonte === "ia" ? "IA" : m.fonte === "email" ? "E-mail" : m.fonte}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -456,20 +528,45 @@ export function DetalheProcesso() {
       {aba === "vinculos" && (
         <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <h3 className="mb-4 font-semibold text-foreground">Prazos e publicações</h3>
-          <div className="flex flex-wrap gap-4">
-            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 min-w-[140px]">
-              <p className="text-2xl font-semibold text-foreground">{p.totalPrazos ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Prazos vinculados</p>
-              <Link to="/prazos" className="mt-1 block text-sm text-primary hover:underline">
-                Ver prazos
-              </Link>
+          <div className="space-y-6">
+            <div>
+              <p className="mb-2 text-sm font-medium text-foreground">
+                Prazos vinculados ({prazosVinculados.length})
+              </p>
+              {prazosVinculados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum prazo vinculado.</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {prazosVinculados.map((pr) => (
+                    <li key={pr.id} className="flex items-center justify-between gap-2 rounded border border-border/60 bg-muted/20 px-3 py-2">
+                      <span className="text-foreground">{pr.prazo}</span>
+                      <span className="text-muted-foreground">{formatarData(pr.data)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 min-w-[140px]">
-              <p className="text-2xl font-semibold text-foreground">{p.totalPublicacoes ?? 0}</p>
-              <p className="text-xs text-muted-foreground">Publicações vinculadas</p>
-              <Link to="/publicacoes" className="mt-1 block text-sm text-primary hover:underline">
-                Ver publicações
-              </Link>
+            <div>
+              <p className="mb-2 text-sm font-medium text-foreground">
+                Publicações vinculadas ({publicacoesVinculadas.length})
+              </p>
+              {publicacoesVinculadas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma publicação vinculada.</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {publicacoesVinculadas.map((pub) => (
+                    <li key={pub.id}>
+                      <Link
+                        to={`/publicacoes/${pub.id}`}
+                        className="block rounded border border-border/60 bg-muted/20 px-3 py-2 text-primary hover:underline"
+                      >
+                        {pub.tipoPublicacao ?? pub.subject ?? `Publicação #${pub.id}`}
+                        {pub.dataPublicacao ? ` · ${formatarData(pub.dataPublicacao)}` : ""}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </section>

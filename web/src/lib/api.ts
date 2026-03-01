@@ -484,6 +484,17 @@ export type ProcessoDetalhe = ProcessoListItem & {
   cliente: Record<string, unknown> | null;
   advogado: { id: number; nomeCompleto: string; login: string } | null;
   movimentacoes: { id: number; ordem: number; movimentacao: string | null; dataMovimentacao: string | null }[];
+  movimentacoesFromPublicacoes: {
+    id: number;
+    tipo: string;
+    resumo: string | null;
+    ordem: number;
+    fonte: string;
+    dataLimite: string | null;
+    publicacaoOabId: number;
+  }[];
+  prazosVinculados: { id: number; prazo: string; data: string; status: number }[];
+  publicacoesVinculadas: { id: number; subject: string | null; tipoPublicacao: string | null; dataPublicacao: string | null }[];
   totalPrazos: number;
   totalPublicacoes: number;
   [key: string]: unknown;
@@ -514,6 +525,18 @@ export function enriquecerProcessosEscavador() {
 
 export function getProcesso(id: number) {
   return api.get<ProcessoDetalhe>(`/api/processos/${id}`);
+}
+
+export function popularMovimentacoesPublicacoes(processoId: number) {
+  return api.post<{ inseridas: number; message: string }>(
+    `/api/processos/${processoId}/popular-movimentacoes-publicacoes`
+  );
+}
+
+export function popularMovimentacoesEscavador(processoId: number) {
+  return api.post<{ inseridas: number; message: string }>(
+    `/api/processos/${processoId}/popular-movimentacoes-escavador`
+  );
 }
 
 export function createProcesso(body: Record<string, unknown>) {
