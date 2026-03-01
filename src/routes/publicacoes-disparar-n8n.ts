@@ -1,8 +1,8 @@
 /**
  * POST /api/publicacoes/:id/disparar-analise-n8n
  * Envia a publicação para o webhook do N8N (final da automação) para rodar apenas a análise com IA.
- * O N8N recebe o payload, executa o nó de IA (Claude), faz o merge e chama PATCH /api/publicacoes/:id
- * para atualizar resumo, baseLegal, observacoesIa, movimentacoes, prazoDiasUteisSugerido.
+ * Se o N8N devolver no response a análise (formato array com content[].text em JSON), o sistema
+ * grava resumo, baseLegal, observacoesIa, movimentacoes, prazoDiasUteisSugerido na publicação.
  *
  * Requer: WEBHOOK_N8N_ANALISE_PUBLICACAO_URL (URL do webhook no N8N).
  * Requer autenticação.
@@ -12,6 +12,51 @@ import type { RequestWithUser } from "../middleware/auth.js";
 import { db } from "../db/index.js";
 import { publicacoesOab } from "../db/schema.js";
 import { eq } from "drizzle-orm";
+
+/** Trunca string para limite do varchar. */
+function v(s: string | null | undefined, max: number): string | null {
+  if (s == null || s === "") return null;
+  const t = String(s).trim();
+  return t.length > max ? t.slice(0, max) : t;
+}
+
+type AnalisePayload = {
+  resumo?: string | null;
+  baseLegal?: string | null;
+  prazoDiasUteisSugerido?: number | null;
+  observacoesIa?: string | null;
+  movimentacoes?: { tipo?: string; resumo?: string }[] | null;
+};
+
+/** Extrai e normaliza a análise do formato de resposta do N8N (array com content[].text = JSON). */
+function extrairAnaliseDaRespostaN8n(body: unknown): AnalisePayload | null {
+  if (!Array.isArray(body) || body.length === 0) return null;
+  const first = body[0] as { content?: Array<{ type?: string; text?: string }> };
+  const content = first?.content;
+  if (!Array.isArray(content) || content.length === 0) return null;
+  const textBlock = content[0];
+  if (textBlock?.type !== "text" || typeof textBlock.text !== "string") return null;
+  const raw = textBlock.text.trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      resumo: typeof parsed.resumo === "string" ? parsed.resumo : null,
+      baseLegal: typeof parsed.baseLegal === "string" ? v(parsed.baseLegal, 255) : null,
+      prazoDiasUteisSugerido:
+        typeof parsed.prazoDiasUteisSugerido === "number" ? parsed.prazoDiasUteisSugerido : null,
+      observacoesIa: typeof parsed.observacoesIa === "string" ? parsed.observacoesIa : null,
+      movimentacoes: Array.isArray(parsed.movimentacoes)
+        ? (parsed.movimentacoes as { tipo?: string; resumo?: string }[]).map((m) => ({
+            tipo: typeof m.tipo === "string" ? m.tipo : "",
+            resumo: typeof m.resumo === "string" ? m.resumo : "",
+          }))
+        : null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function dispararAnaliseN8n(
   req: RequestWithUser,
@@ -91,10 +136,49 @@ export async function dispararAnaliseN8n(
       });
       return;
     }
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      res.json({
+        ok: true,
+        message:
+          "Enviado para análise no N8N. A resposta não veio em JSON; a publicação não foi atualizada.",
+      });
+      return;
+    }
+
+    const analise = extrairAnaliseDaRespostaN8n(body);
+    if (analise) {
+      const update: {
+        resumo?: string | null;
+        baseLegal?: string | null;
+        prazoDiasUteisSugerido?: number | null;
+        observacoesIa?: string | null;
+        movimentacoes?: { tipo: string; resumo: string }[] | null;
+      } = {};
+      if (analise.resumo !== undefined) update.resumo = analise.resumo;
+      if (analise.baseLegal !== undefined) update.baseLegal = analise.baseLegal;
+      if (analise.prazoDiasUteisSugerido !== undefined)
+        update.prazoDiasUteisSugerido = analise.prazoDiasUteisSugerido;
+      if (analise.observacoesIa !== undefined) update.observacoesIa = analise.observacoesIa;
+      if (analise.movimentacoes !== undefined) update.movimentacoes = analise.movimentacoes;
+
+      if (Object.keys(update).length > 0) {
+        await db.update(publicacoesOab).set(update).where(eq(publicacoesOab.id, id));
+      }
+      res.json({
+        ok: true,
+        message: "Análise recebida e gravada na publicação.",
+      });
+      return;
+    }
+
     res.json({
       ok: true,
       message:
-        "Enviado para análise no N8N. A publicação será atualizada em instantes se o workflow estiver ativo.",
+        "Enviado para análise no N8N. A resposta não continha análise em formato esperado; a publicação não foi alterada.",
     });
   } catch (err) {
     console.error("Disparar análise N8N:", err);
