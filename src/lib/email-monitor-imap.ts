@@ -30,6 +30,25 @@ function asString(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+/** Converte lista de UIDs em sequence set no formato que o Yahoo aceita (ex.: "1:3,5:7"). */
+function uidsToSequenceSet(uids: number[]): string {
+  if (uids.length === 0) return "";
+  const ranges: string[] = [];
+  let start = uids[0];
+  let end = uids[0];
+  for (let i = 1; i < uids.length; i++) {
+    if (uids[i] === end + 1) {
+      end = uids[i];
+    } else {
+      ranges.push(start === end ? String(start) : `${start}:${end}`);
+      start = uids[i];
+      end = uids[i];
+    }
+  }
+  ranges.push(start === end ? String(start) : `${start}:${end}`);
+  return ranges.join(",");
+}
+
 async function streamToBuffer(
   stream: NodeJS.ReadableStream | Buffer
 ): Promise<Buffer> {
@@ -73,10 +92,12 @@ export async function fetchRecentEmails(
       const numericUids = (Array.isArray(uids) ? uids : [])
         .map((u) => (typeof u === "number" ? u : Number(u)))
         .filter((n) => Number.isInteger(n) && n > 0);
-      const toFetch = numericUids.slice(-MAX_MESSAGES);
+      const sorted = [...new Set(numericUids)].sort((a, b) => a - b);
+      const toFetch = sorted.slice(-MAX_MESSAGES);
       if (toFetch.length === 0) return results;
 
-      const sequenceSet = toFetch.join(",");
+      // Yahoo rejeita "1,2,3" com "FETCH Bad sequence" — usar formato em intervalos "1:3"
+      const sequenceSet = uidsToSequenceSet(toFetch);
       for await (const msg of client.fetch(sequenceSet, {
         uid: true,
         envelope: true,
