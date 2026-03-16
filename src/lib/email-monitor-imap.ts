@@ -69,7 +69,11 @@ export async function fetchRecentEmails(
         { since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
         { uid: true }
       );
-      const toFetch = Array.isArray(uids) ? uids.slice(-MAX_MESSAGES) : [];
+      // Apenas UIDs numéricos (Yahoo e outros podem devolver formato diferente)
+      const numericUids = (Array.isArray(uids) ? uids : [])
+        .map((u) => (typeof u === "number" ? u : Number(u)))
+        .filter((n) => Number.isInteger(n) && n > 0);
+      const toFetch = numericUids.slice(-MAX_MESSAGES);
       if (toFetch.length === 0) return results;
 
       const sequenceSet = toFetch.join(",");

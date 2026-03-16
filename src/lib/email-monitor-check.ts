@@ -172,16 +172,22 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
 /** Monta mensagem clara a partir do erro (IMAP costuma vir só "Command failed"). */
 function formatEmailCheckError(err: unknown): string {
   if (!(err instanceof Error)) return String(err);
-  const e = err as Error & { code?: string; response?: { text?: string }; text?: string };
+  const e = err as Error & {
+    code?: string;
+    response?: { text?: string; value?: string };
+    text?: string;
+    responseText?: string;
+    source?: string;
+  };
   let msg = e.message;
   if (e.code && typeof e.code === "string") msg += ` [${e.code}]`;
-  const serverText = e.response?.text ?? e.text;
+  const serverText =
+    e.response?.text ?? e.response?.value ?? e.text ?? e.responseText ?? e.source;
   if (serverText && typeof serverText === "string" && serverText.trim()) {
-    msg += " — Servidor: " + serverText.trim().slice(0, 200);
+    msg += " — " + serverText.trim().slice(0, 250);
   }
-  if (msg === "Command failed" && e.stack) {
-    const match = e.stack.match(/^\s+at\s+.+$/m);
-    if (match) msg += " " + match[0].trim();
+  if (msg === "Command failed" || (msg.startsWith("Command failed") && !msg.includes("—"))) {
+    msg += ". Verifique: senha de app correta (Yahoo); conta ativa; Remetentes vazio para aceitar todos.";
   }
   return msg;
 }

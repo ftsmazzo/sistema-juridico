@@ -34,7 +34,8 @@ Em **Monitoramento de e-mail** → Nova conta (ou Editar a conta do Adriano), us
 | **Senha**     | A **senha de app** de 16 caracteres (não a senha normal do Yahoo) |
 
 - **Remetentes:** deixe **vazio** para trazer todos os e-mails da caixa de entrada (incluindo encaminhados).  
-  Se preencher (ex.: `@recortedigital.adv.br`), o sistema só processa e-mails **de** esses remetentes.
+  Se preencher (ex.: `@recortedigital.adv.br`), o sistema só processa e-mails **de** esses remetentes.  
+  **Não colocar e-mail no filtro não é problema** — vazio é o correto para receber tudo.
 
 ---
 
@@ -58,6 +59,8 @@ O sistema busca e-mails dos **últimos 30 dias** na pasta **INBOX**. E-mails em 
 - **Senha:** sempre a **senha de app** gerada no site do Yahoo, nunca a senha normal.
 - **Remetentes em branco:** processa todos os e-mails da caixa de entrada (incluindo encaminhados).
 - Em caso de erro, ver a mensagem em **Monitoramento de e-mail** (coluna de status ou ao editar a conta).
+
+**Se aparecer "Command failed" (ImapFlow.reader):** costuma ser rejeição do servidor Yahoo (login/senha ou comando). Confirme: (1) está usando a **senha de app** (não a senha normal); (2) **Remetentes** está vazio; (3) a conta Yahoo está ativa e sem bloqueio. Se tiver gerado uma nova senha de app, use a mais recente na tela Editar conta → Senha → Salvar.
 
 ---
 
