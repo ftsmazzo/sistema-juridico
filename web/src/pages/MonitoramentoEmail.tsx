@@ -191,9 +191,8 @@ export function MonitoramentoEmail() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Monitoramento de e-mail</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie várias contas IMAP. Cada conta pode ter verificação automática e botão
-            &quot;Verificar agora&quot;. Publicações são criadas a partir dos e-mails; use
-            &quot;Análise com IA&quot; na publicação para gerar prazos.
+            Gerencie várias contas IMAP (ex.: adrianolms@yahoo.com.br). Use o botão &quot;Yahoo&quot; ao editar para preencher host/porta. Yahoo exige senha de app — veja{" "}
+            <a href="https://help.yahoo.com/kb/new-yahoo-mail/imap-server-settings-yahoo-mail-sln4075.html" target="_blank" rel="noopener noreferrer" className="text-primary underline">configuração Yahoo</a>.
           </p>
         </div>
         <button
@@ -296,6 +295,11 @@ export function MonitoramentoEmail() {
             <h2 className="mb-4 font-semibold text-foreground">
               {editingId != null ? "Editar conta" : "Nova conta"}
             </h2>
+            {contaEdit?.lastError && (
+              <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                <strong>Último erro na verificação:</strong> {contaEdit.lastError}
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-muted-foreground">Nome</label>
@@ -310,13 +314,32 @@ export function MonitoramentoEmail() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground">Host IMAP</label>
-                  <input
-                    type="text"
-                    value={form.host ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    placeholder="imap.exemplo.com"
-                  />
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={form.host ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
+                      className="block flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      placeholder="imap.exemplo.com"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          host: "imap.mail.yahoo.com",
+                          port: 993,
+                          secure: true,
+                        }))
+                      }
+                      className="shrink-0 rounded border border-border bg-muted/50 px-2 py-1.5 text-xs font-medium hover:bg-muted"
+                    >
+                      Yahoo
+                    </button>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Yahoo: use o botão e senha de app (não a senha normal)
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground">Porta</label>
@@ -364,6 +387,11 @@ export function MonitoramentoEmail() {
                   placeholder="••••••••"
                   autoComplete="new-password"
                 />
+                {(form.host ?? "").toLowerCase().includes("yahoo") && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    Yahoo exige senha de app. Gere em: Conta Yahoo → Segurança → Senhas de app. Use essa senha aqui, não a senha normal.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground">
@@ -376,6 +404,9 @@ export function MonitoramentoEmail() {
                   rows={2}
                   placeholder="@recortedigital.adv.br"
                 />
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Vazio = processa todos os e-mails (incluindo encaminhados). Preencha só se quiser filtrar por remetente.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
