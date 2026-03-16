@@ -87,11 +87,14 @@ export async function fetchRecentEmails(
           })) {
             const envelope = msg.envelope;
             if (!envelope) continue;
-            const fromAddr = envelope.from?.[0]?.address ?? "";
+            const fromAddr = (envelope.from?.[0]?.address ?? "").toLowerCase();
             if (filterFrom && filterFrom.length > 0) {
               const match = filterFrom.some((f) => {
-                if (f.startsWith("@")) return fromAddr.toLowerCase().endsWith(f.toLowerCase());
-                return fromAddr.toLowerCase().includes(f.toLowerCase());
+                const ft = f.trim().toLowerCase();
+                if (!ft) return true;
+                if (ft.startsWith("@")) return fromAddr.endsWith(ft);
+                if (ft.includes("@")) return fromAddr.includes(ft) || fromAddr.endsWith(ft.split("@")[1]);
+                return fromAddr.includes(ft);
               });
               if (!match) continue;
             }

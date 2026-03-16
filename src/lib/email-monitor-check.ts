@@ -92,6 +92,10 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       sinceDays
     );
 
+    console.log(
+      `Email check conta ${conta.id} (${conta.user}): ${emails.length} e-mail(s) nos últimos ${sinceDays} dias`
+    );
+
     let publicacoesCriadas = 0;
     let prazosCriados = 0;
     /** Publicações que tiveram análise IA gravada nesta run (para notificação única ou agrupada). */
@@ -106,6 +110,9 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
         to: email.to,
         emailId: email.messageId,
       });
+      if (itens.length > 0) {
+        console.log(`  Recorte encontrado em e-mail "${email.subject?.slice(0, 50)}": ${itens.length} publicação(ões)`);
+      }
       for (const item of itens) {
         const result = await processarItemPublicacaoOab(item);
         if (result.publicacaoId) {
@@ -153,6 +160,9 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       })
       .where(eq(contaEmailMonitoramento.id, conta.id));
 
+    console.log(
+      `Email check conta ${conta.id}: ${publicacoesCriadas} publicação(ões) criada(s) a partir de ${emails.length} e-mail(s)`
+    );
     return {
       ok: true,
       publicacoesCriadas,
