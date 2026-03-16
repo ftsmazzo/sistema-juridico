@@ -77,50 +77,53 @@ export async function fetchRecentEmails(
       const toFetch = sorted.slice(-MAX_MESSAGES);
       if (toFetch.length === 0) return results;
 
-      // Yahoo rejeita FETCH com vários UIDs ("Bad sequence") — buscar um por vez
+      // FETCH por UID: o 3º parâmetro (options) deve ter { uid: true }, senão o servidor trata o range como sequence number e falha.
+      // Buscar um por vez (Yahoo e outros rejeitam range; para outros provedores poderia tentar batch depois).
       for (const uid of toFetch) {
         try {
-          for await (const msg of client.fetch(String(uid), {
-            uid: true,
-            envelope: true,
-            source: true,
-          })) {
-            const envelope = msg.envelope;
-            if (!envelope) continue;
-            const fromAddr = (envelope.from?.[0]?.address ?? "").toLowerCase();
-            if (filterFrom && filterFrom.length > 0) {
-              const match = filterFrom.some((f) => {
-                const ft = f.trim().toLowerCase();
-                if (!ft) return true;
-                if (ft.startsWith("@")) return fromAddr.endsWith(ft);
-                if (ft.includes("@")) return fromAddr.includes(ft) || fromAddr.endsWith(ft.split("@")[1]);
-                return fromAddr.includes(ft);
-              });
-              if (!match) continue;
-            }
-
-            if (msg.source == null) continue;
-            const raw = await streamToBuffer(msg.source);
-            const parsed = await simpleParser(raw);
-            const text = asString(parsed.text);
-            const html = asString(parsed.html);
-            const fromObj = Array.isArray(parsed.from) ? parsed.from[0] : parsed.from;
-            const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
-            const messageId =
-              typeof parsed.messageId === "string" ? parsed.messageId : `uid-${msg.uid}`;
-            const subject = typeof parsed.subject === "string" ? parsed.subject : "";
-            results.push({
-              messageId,
-              subject,
-              from: asString((fromObj as { text?: unknown } | undefined)?.text) || fromAddr,
-              to: asString((toObj as { text?: unknown } | undefined)?.text),
-              date: parsed.date ?? new Date(),
-              text,
-              html,
+          const msg = await client.fetchOne(uid, { envelope: true, source: true }, { uid: true });
+          if (!msg) continue;
+          const envelope = msg.envelope;
+          if (!envelope) continue;
+          const fromAddr = (envelope.from?.[0]?.address ?? "").toLowerCase();
+          if (filterFrom && filterFrom.length > 0) {
+            const match = filterFrom.some((f) => {
+              const ft = f.trim().toLowerCase();
+              if (!ft) return true;
+              if (ft.startsWith("@")) return fromAddr.endsWith(ft);
+              if (ft.includes("@")) return fromAddr.includes(ft) || fromAddr.endsWith(ft.split("@")[1]);
+              return fromAddr.includes(ft);
             });
+            if (!match) continue;
           }
+
+          if (msg.source == null) continue;
+          const raw = await streamToBuffer(msg.source);
+          const parsed = await simpleParser(raw);
+          const text = asString(parsed.text);
+          const html = asString(parsed.html);
+          const fromObj = Array.isArray(parsed.from) ? parsed.from[0] : parsed.from;
+          const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
+          const messageId =
+            typeof parsed.messageId === "string" ? parsed.messageId : `uid-${msg.uid}`;
+          const subject = typeof parsed.subject === "string" ? parsed.subject : "";
+          results.push({
+            messageId,
+            subject,
+            from: asString((fromObj as { text?: unknown } | undefined)?.text) || fromAddr,
+            to: asString((toObj as { text?: unknown } | undefined)?.text),
+            date: parsed.date ?? new Date(),
+            text,
+            html,
+          });
         } catch (err) {
-          console.warn(`IMAP fetch UID ${uid} falhou:`, err instanceof Error ? err.message : err);
+          const e = err as Error & { response?: { text?: string }; text?: string };
+          const serverMsg = e.response?.text ?? e.text ?? "";
+          console.warn(
+            `IMAP fetch UID ${uid} falhou:`,
+            e.message,
+            serverMsg ? `— ${String(serverMsg).slice(0, 120)}` : ""
+          );
         }
       }
     } finally {
