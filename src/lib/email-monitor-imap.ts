@@ -30,25 +30,6 @@ function asString(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-/** Converte lista de UIDs em sequence set no formato que o Yahoo aceita (ex.: "1:3,5:7"). */
-function uidsToSequenceSet(uids: number[]): string {
-  if (uids.length === 0) return "";
-  const ranges: string[] = [];
-  let start = uids[0];
-  let end = uids[0];
-  for (let i = 1; i < uids.length; i++) {
-    if (uids[i] === end + 1) {
-      end = uids[i];
-    } else {
-      ranges.push(start === end ? String(start) : `${start}:${end}`);
-      start = uids[i];
-      end = uids[i];
-    }
-  }
-  ranges.push(start === end ? String(start) : `${start}:${end}`);
-  return ranges.join(",");
-}
-
 async function streamToBuffer(
   stream: NodeJS.ReadableStream | Buffer
 ): Promise<Buffer> {
@@ -96,43 +77,48 @@ export async function fetchRecentEmails(
       const toFetch = sorted.slice(-MAX_MESSAGES);
       if (toFetch.length === 0) return results;
 
-      // Yahoo rejeita "1,2,3" com "FETCH Bad sequence" — usar formato em intervalos "1:3"
-      const sequenceSet = uidsToSequenceSet(toFetch);
-      for await (const msg of client.fetch(sequenceSet, {
-        uid: true,
-        envelope: true,
-        source: true,
-      })) {
-        const envelope = msg.envelope;
-        if (!envelope) continue;
-        const fromAddr = envelope.from?.[0]?.address ?? "";
-        if (filterFrom && filterFrom.length > 0) {
-          const match = filterFrom.some((f) => {
-            if (f.startsWith("@")) return fromAddr.toLowerCase().endsWith(f.toLowerCase());
-            return fromAddr.toLowerCase().includes(f.toLowerCase());
-          });
-          if (!match) continue;
-        }
+      // Yahoo rejeita FETCH com vários UIDs ("Bad sequence") — buscar um por vez
+      for (const uid of toFetch) {
+        try {
+          for await (const msg of client.fetch(String(uid), {
+            uid: true,
+            envelope: true,
+            source: true,
+          })) {
+            const envelope = msg.envelope;
+            if (!envelope) continue;
+            const fromAddr = envelope.from?.[0]?.address ?? "";
+            if (filterFrom && filterFrom.length > 0) {
+              const match = filterFrom.some((f) => {
+                if (f.startsWith("@")) return fromAddr.toLowerCase().endsWith(f.toLowerCase());
+                return fromAddr.toLowerCase().includes(f.toLowerCase());
+              });
+              if (!match) continue;
+            }
 
-        if (msg.source == null) continue;
-        const raw = await streamToBuffer(msg.source);
-        const parsed = await simpleParser(raw);
-        const text = asString(parsed.text);
-        const html = asString(parsed.html);
-        const fromObj = Array.isArray(parsed.from) ? parsed.from[0] : parsed.from;
-        const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
-        const messageId =
-          typeof parsed.messageId === "string" ? parsed.messageId : `uid-${msg.uid}`;
-        const subject = typeof parsed.subject === "string" ? parsed.subject : "";
-        results.push({
-          messageId,
-          subject,
-          from: asString((fromObj as { text?: unknown } | undefined)?.text) || fromAddr,
-          to: asString((toObj as { text?: unknown } | undefined)?.text),
-          date: parsed.date ?? new Date(),
-          text,
-          html,
-        });
+            if (msg.source == null) continue;
+            const raw = await streamToBuffer(msg.source);
+            const parsed = await simpleParser(raw);
+            const text = asString(parsed.text);
+            const html = asString(parsed.html);
+            const fromObj = Array.isArray(parsed.from) ? parsed.from[0] : parsed.from;
+            const toObj = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to;
+            const messageId =
+              typeof parsed.messageId === "string" ? parsed.messageId : `uid-${msg.uid}`;
+            const subject = typeof parsed.subject === "string" ? parsed.subject : "";
+            results.push({
+              messageId,
+              subject,
+              from: asString((fromObj as { text?: unknown } | undefined)?.text) || fromAddr,
+              to: asString((toObj as { text?: unknown } | undefined)?.text),
+              date: parsed.date ?? new Date(),
+              text,
+              html,
+            });
+          }
+        } catch (err) {
+          console.warn(`IMAP fetch UID ${uid} falhou:`, err instanceof Error ? err.message : err);
+        }
       }
     } finally {
       lock.release();
