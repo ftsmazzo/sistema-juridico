@@ -297,13 +297,6 @@ function upsertConta(
       })
       .catch((err) => {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("EMAIL_MONITOR_ENCRYPTION_KEY")) {
-          res.status(503).json({
-            error:
-              "Criptografia não configurada. Defina EMAIL_MONITOR_ENCRYPTION_KEY (64 caracteres hex) no servidor.",
-          });
-          return;
-        }
         res.status(500).json({ error: msg });
       });
     return;
@@ -338,13 +331,6 @@ function upsertConta(
     })
     .catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("EMAIL_MONITOR_ENCRYPTION_KEY")) {
-        res.status(503).json({
-          error:
-            "Criptografia não configurada. Defina EMAIL_MONITOR_ENCRYPTION_KEY (64 caracteres hex) no servidor.",
-        });
-        return;
-      }
       res.status(500).json({ error: msg });
     });
 }

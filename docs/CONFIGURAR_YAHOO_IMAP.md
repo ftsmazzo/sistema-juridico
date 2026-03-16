@@ -2,6 +2,8 @@
 
 O sistema lê a caixa de entrada **via IMAP** para buscar publicações do Recorte Digital. Para o **Yahoo** (incluindo **adrianolms@yahoo.com.br**) funcionar, é obrigatório usar **senha de app**, não a senha normal da conta.
 
+**Definir a senha:** use **só a tela do sistema**. Vá em **Monitoramento de e-mail** → **Editar** na conta → campo **Senha** → cole a senha de app → **Salvar**. Não precisa rodar nada no terminal.
+
 ---
 
 ## 1. Senha de app (obrigatório)
@@ -59,21 +61,6 @@ O sistema busca e-mails dos **últimos 30 dias** na pasta **INBOX**. E-mails em 
 
 ---
 
-## 5. Atualizar a senha de app direto no banco (se a tela der "Command failed")
+## 5. Senha pela tela (sem terminal)
 
-A senha é guardada criptografada. Use o script na raiz do projeto (com a **mesma** `EMAIL_MONITOR_ENCRYPTION_KEY` que está no EasyPanel no seu `.env`):
-
-```bash
-# No seu micro, com .env contendo EMAIL_MONITOR_ENCRYPTION_KEY (ex.: openssl rand -hex 32)
-npm run email-monitor:encrypt "sua-senha-de-app-16-caracteres"
-```
-
-O script imprime o valor para `password_encrypted` e um exemplo de SQL. Copie o `UPDATE` gerado (ou monte assim) e execute no PostgreSQL do servidor:
-
-```sql
-UPDATE conta_email_monitoramento
-SET password_encrypted = 'VALOR_QUE_O_SCRIPT_IMPRIMIU'
-WHERE "user" = 'adrianolms@yahoo.com.br';
-```
-
-**Importante:** a variável `EMAIL_MONITOR_ENCRYPTION_KEY` precisa existir no EasyPanel (API) para o sistema conseguir descriptografar ao verificar o e-mail. Se ainda não tiver, crie com `openssl rand -hex 32` e coloque nas variáveis de ambiente do serviço da API.
+Sempre que precisar alterar a senha da conta: **Monitoramento de e-mail** → **Editar** na conta do Adriano → campo **Senha** → cole a senha de app do Yahoo → **Salvar**. Nada de terminal nem SQL. A variável `EMAIL_MONITOR_ENCRYPTION_KEY` no servidor é **opcional** (se não estiver definida, a senha é guardada de forma que o sistema consiga usar na verificação).
