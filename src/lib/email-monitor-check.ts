@@ -149,7 +149,8 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       emailsProcessados: emails.length,
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Email monitor check erro:", err);
+    const msg = formatEmailCheckError(err);
     await db
       .update(contaEmailMonitoramento)
       .set({
@@ -166,4 +167,21 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       erro: msg,
     };
   }
+}
+
+/** Monta mensagem clara a partir do erro (IMAP costuma vir só "Command failed"). */
+function formatEmailCheckError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const e = err as Error & { code?: string; response?: { text?: string }; text?: string };
+  let msg = e.message;
+  if (e.code && typeof e.code === "string") msg += ` [${e.code}]`;
+  const serverText = e.response?.text ?? e.text;
+  if (serverText && typeof serverText === "string" && serverText.trim()) {
+    msg += " — Servidor: " + serverText.trim().slice(0, 200);
+  }
+  if (msg === "Command failed" && e.stack) {
+    const match = e.stack.match(/^\s+at\s+.+$/m);
+    if (match) msg += " " + match[0].trim();
+  }
+  return msg;
 }

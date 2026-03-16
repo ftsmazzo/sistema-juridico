@@ -52,6 +52,10 @@ export async function fetchRecentEmails(
     secure: config.secure,
     auth: { user: config.user, pass: config.password },
     logger: false,
+    // Yahoo e outros exigem SNI (servername) no TLS para não dar "Command failed"
+    ...(config.secure && config.host
+      ? { tls: { servername: config.host } }
+      : {}),
   });
 
   const results: EmailMessage[] = [];
