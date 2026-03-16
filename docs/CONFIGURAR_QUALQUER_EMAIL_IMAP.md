@@ -13,10 +13,42 @@ O servidor IMAP precisa receber o comando FETCH indicando que os números são *
 | **Yahoo** (yahoo.com, yahoo.com.br) | `imap.mail.yahoo.com` | 993 | Sim | Usar **senha de app**, não a senha da conta. Ver [CONFIGURAR_YAHOO_IMAP.md](CONFIGURAR_YAHOO_IMAP.md). |
 | **Gmail** | `imap.gmail.com` | 993 | Sim | Usar senha de app (Google: Conta → Segurança → Senhas de app). |
 | **Outlook / Microsoft 365** | `outlook.office365.com` | 993 | Sim | Pode exigir "Acesso a apps menos seguros" ou conta de app. |
-| **E-mail OAB / corporativo** | Fornecido pelo provedor | 993 ou 143 | 993=Sim, 143=STARTTLS | Host costuma ser tipo `imap.dominio.adv.br` ou `mail.dominio.com.br`. |
+| **E-mail OAB SP** (@adv.oabsp.org.br) | Ver seção abaixo | 993 ou 143 | Sim (993) | Pode ser só POP3; testar hosts IMAP. |
+| **Outros OAB / corporativo** | Fornecido pelo provedor | 993 ou 143 | 993=Sim, 143=STARTTLS | Host costuma ser tipo `imap.dominio.adv.br` ou `mail.dominio.com.br`. |
 
 - **Porta 993**: conexão SSL/TLS direta (marque **SSL/TLS** na conta).
 - **Porta 143**: conexão sem criptografia inicial; o servidor pode pedir STARTTLS (o cliente faz upgrade). Use **SSL/TLS** desmarcado só se o provedor indicar porta 143 sem SSL.
+
+---
+
+## E-mail OAB SP (ex.: feresnajm@adv.oabsp.org.br)
+
+O e-mail institucional da OAB São Paulo usa o domínio **@adv.oabsp.org.br**. Em fontes públicas há **POP3** garantido e referências a **IMAP** em material mais recente; a documentação oficial no webmail pode não listar o IMAP.
+
+### O que testar no sistema (Monitoramento de e-mail → Nova conta / Editar)
+
+Teste **nesta ordem** (um host por vez; se der erro de conexão ou login, passe para o próximo):
+
+| Tentativa | Host IMAP           | Porta | SSL/TLS |
+|-----------|---------------------|-------|---------|
+| 1         | `imap.adv.oabsp.org.br` | 993   | Sim     |
+| 2         | `mail.adv.oabsp.org.br` | 993   | Sim     |
+| 3         | `imap.adv.oabsp.org.br` | 143   | Não (STARTTLS) |
+
+- **Usuário**: o e-mail completo, ex.: `feresnajm@adv.oabsp.org.br`.
+- **Senha**: a mesma que você usa no webmail da OAB SP.
+
+**Importante:** O sistema hoje só usa **IMAP**. Se a OAB SP oferecer **apenas POP3** (servidor `pop3.adv.oabsp.org.br`), a conta não funcionará no monitoramento até que o sistema ganhe suporte a POP3. Em várias fontes antigas consta que o e-mail OAB SP era só POP3; em outras (mais recentes) aparece `imap.adv.oabsp.org.br` — por isso vale testar o host IMAP primeiro.
+
+### Se nada funcionar
+
+- **Webmail:** acesse **https://webmail.adv.oabsp.org.br** (ou https://webmail.oabsp.org.br) e veja se há link de “Ajuda”, “Configuração” ou “Cliente de e-mail” com **host IMAP** e porta.
+- **Suporte OAB SP (e-mail):** **suporte.email@oabsp.org.br** — pergunte explicitamente: “Qual o servidor e a porta **IMAP** para configurar o e-mail @adv.oabsp.org.br em um cliente (Thunderbird/Outlook)?”
+- **Telefone:** (11) 3291-3777 — mesmo questionamento.
+
+Assim você obtém dados oficiais e confiáveis. Se confirmarem que existe IMAP, use no sistema exatamente o host e a porta informados.
+
+---
 
 ## Campos na conta (sistema)
 
