@@ -21,6 +21,12 @@ export type CheckResult = {
   erro?: string;
 };
 
+/** IDs das contas que estão sendo verificadas agora (para o front mostrar "Verificando..." após F5). */
+const checkingInProgressIds = new Set<number>();
+export function isCheckingInProgress(contaId: number): boolean {
+  return checkingInProgressIds.has(contaId);
+}
+
 export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
   const [conta] = await db
     .select()
@@ -69,6 +75,10 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       ? conta.remetentesFiltro
       : undefined;
 
+  // Primeira verificação (nunca rodou): 30 dias. Depois: só últimos 3 dias (já fez varredura geral).
+  const sinceDays = conta.lastCheckedAt != null ? 3 : 30;
+
+  checkingInProgressIds.add(conta.id);
   try {
     const emails = await fetchRecentEmails(
       {
@@ -78,7 +88,8 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
         user: conta.user,
         password,
       },
-      filterFrom
+      filterFrom,
+      sinceDays
     );
 
     let publicacoesCriadas = 0;
@@ -166,6 +177,8 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       emailsProcessados: 0,
       erro: msg,
     };
+  } finally {
+    checkingInProgressIds.delete(conta.id);
   }
 }
 

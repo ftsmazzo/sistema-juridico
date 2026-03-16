@@ -216,6 +216,8 @@ export type EmailMonitorConfig = {
   lastCheckedAt: string | null;
   lastError: string | null;
   ativo: boolean;
+  /** True enquanto a verificação está rodando no servidor (continua após F5). */
+  checkingInProgress?: boolean;
   /** ID do usuário vinculado (para notificação WhatsApp). */
   idUsuario: number | null;
   /** OAB do advogado da conta (alternativa para notificação). */
@@ -341,7 +343,7 @@ export function getPrazos(params: {
 
 /** Retorna a URL de inscrição do calendário (meus prazos); gera token se não existir. */
 export function getLinkInscricaoCalendario() {
-  return api.get<{ url: string }>("/api/prazos/link-inscricao");
+  return api.get<{ url: string; totalPrazos: number }>("/api/prazos/link-inscricao");
 }
 
 /**

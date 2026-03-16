@@ -14,7 +14,7 @@ import { db } from "../db/index.js";
 import { contaEmailMonitoramento } from "../db/schema.js";
 import { eq, asc } from "drizzle-orm";
 import { encryptPassword } from "../lib/email-monitor-encrypt.js";
-import { runEmailCheck } from "../lib/email-monitor-check.js";
+import { runEmailCheck, isCheckingInProgress } from "../lib/email-monitor-check.js";
 
 export type ConfigResponse = {
   id: number;
@@ -28,6 +28,8 @@ export type ConfigResponse = {
   lastCheckedAt: string | null;
   lastError: string | null;
   ativo: boolean;
+  /** True enquanto a verificação está rodando no servidor (sobrevive a F5). */
+  checkingInProgress?: boolean;
   idUsuario: number | null;
   numeroOab: string | null;
   createdAt: string;
@@ -121,7 +123,9 @@ export async function listContas(
     .select()
     .from(contaEmailMonitoramento)
     .orderBy(asc(contaEmailMonitoramento.id));
-  res.json(rows.map(toConfigResponse));
+  res.json(
+    rows.map((r) => ({ ...toConfigResponse(r), checkingInProgress: isCheckingInProgress(r.id) }))
+  );
 }
 
 /** GET /api/email-monitor/contas/:id — uma conta para edição. */

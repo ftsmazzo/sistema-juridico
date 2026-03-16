@@ -32,35 +32,30 @@ Em **Monitoramento de e-mail** → Nova conta (ou Editar a conta do Adriano), us
 | **SSL/TLS**   | Marcado (ativo)         |
 | **E-mail (usuário)** | `adrianolms@yahoo.com.br` |
 | **Senha**     | A **senha de app** de 16 caracteres (não a senha normal do Yahoo) |
+| **Remetentes** | `oabsp@recortedigital.adv.br` (um por linha) |
 
-- **Remetentes:** deixe **vazio** para trazer todos os e-mails da caixa de entrada (incluindo encaminhados).  
-  Se preencher (ex.: `@recortedigital.adv.br`), o sistema só processa e-mails **de** esses remetentes.  
-  **Não colocar e-mail no filtro não é problema** — vazio é o correto para receber tudo.
+O Recorte Digital OAB chega **sempre** desse remetente. No campo **Remetentes**, coloque exatamente:
+`oabsp@recortedigital.adv.br`  
+Assim o sistema processa **só** e-mails vindos desse endereço e ignora o resto da caixa.
 
 ---
 
-## 3. Teste com e-mails encaminhados
+## 3. Verificação
 
-Você encaminou 3 publicações de **fredmazzo@gmail.com** para **adrianolms@yahoo.com.br**:
+1. A conta deve estar com os dados acima (Host, Porta, E-mail, Senha, **Remetentes** = `oabsp@recortedigital.adv.br`) e **ativa**.
+2. Clique em **Verificar agora**. A verificação pode levar alguns minutos.
+3. Se aparecer **Erro**, edite a conta e veja a mensagem completa. Se der **0 publicações**, confira se há e-mails do Recorte na caixa e se **Remetentes** está com `oabsp@recortedigital.adv.br`.
 
-1. Os e-mails devem estar na **Caixa de entrada** do adrianolms@yahoo.com.br.
-2. No sistema, a conta deve estar com os dados acima e **ativa**.
-3. Clique em **Verificar agora** na conta.  
-   - Se aparecer **Erro** na lista, passe o mouse ou edite a conta para ver a mensagem completa (ex.: falha de autenticação = senha errada ou uso da senha normal em vez da senha de app).
-   - Se não aparecer erro mas **0 e-mails**: confira se o **Remetentes** está vazio (para aceitar qualquer remetente, inclusive encaminhados).
-
-O sistema busca e-mails dos **últimos 30 dias** na pasta **INBOX**. E-mails em outras pastas (Rascunhos, Enviados, etc.) não são lidos.
+O sistema busca na pasta **INBOX** (primeira vez: últimos 30 dias; depois: últimos 3 dias).
 
 ---
 
 ## 4. Resumo
 
 - **Yahoo:** host `imap.mail.yahoo.com`, porta `993`, SSL ativo.
-- **Senha:** sempre a **senha de app** gerada no site do Yahoo, nunca a senha normal.
-- **Remetentes em branco:** processa todos os e-mails da caixa de entrada (incluindo encaminhados).
+- **Senha:** sempre a **senha de app** do Yahoo.
+- **Remetentes:** `oabsp@recortedigital.adv.br` — e-mail de onde vêm as publicações do Recorte Digital OAB. O sistema só processa mensagens **de** esse remetente.
 - Em caso de erro, ver a mensagem em **Monitoramento de e-mail** (coluna de status ou ao editar a conta).
-
-**Se aparecer "Command failed" (ImapFlow.reader):** costuma ser rejeição do servidor Yahoo (login/senha ou comando). Confirme: (1) está usando a **senha de app** (não a senha normal); (2) **Remetentes** está vazio; (3) a conta Yahoo está ativa e sem bloqueio. Se tiver gerado uma nova senha de app, use a mais recente na tela Editar conta → Senha → Salvar.
 
 ---
 

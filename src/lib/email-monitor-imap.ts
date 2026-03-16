@@ -41,10 +41,12 @@ async function streamToBuffer(
 
 /**
  * Conecta ao IMAP, busca as últimas mensagens da caixa de entrada e retorna envelopes + corpo.
+ * @param sinceDays - Quantos dias para trás (ex.: 30 = primeira varredura; 3 = verificações seguintes).
  */
 export async function fetchRecentEmails(
   config: ImapConfig,
-  filterFrom?: string[]
+  filterFrom?: string[],
+  sinceDays: number = 30
 ): Promise<EmailMessage[]> {
   const client = new ImapFlow({
     host: config.host,
@@ -65,10 +67,8 @@ export async function fetchRecentEmails(
   try {
     const lock = await client.getMailboxLock(INBOX);
     try {
-      const uids = await client.search(
-        { since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-        { uid: true }
-      );
+      const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+      const uids = await client.search({ since: sinceDate }, { uid: true });
       // Apenas UIDs numéricos (Yahoo e outros podem devolver formato diferente)
       const numericUids = (Array.isArray(uids) ? uids : [])
         .map((u) => (typeof u === "number" ? u : Number(u)))

@@ -45,6 +45,7 @@ export function MonitoramentoEmail() {
   const { data: contas = [], isPending } = useQuery({
     queryKey: ["email-monitor-contas"],
     queryFn: listContasEmail,
+    refetchInterval: 4000,
   });
 
   const { data: contaEdit } = useQuery({
@@ -193,6 +194,7 @@ export function MonitoramentoEmail() {
           <p className="mt-1 text-sm text-muted-foreground">
             Gerencie várias contas IMAP (ex.: adrianolms@yahoo.com.br). Use o botão &quot;Yahoo&quot; ao editar para preencher host/porta. Yahoo exige senha de app — veja{" "}
             <a href="https://help.yahoo.com/kb/new-yahoo-mail/imap-server-settings-yahoo-mail-sln4075.html" target="_blank" rel="noopener noreferrer" className="text-primary underline">configuração Yahoo</a>.
+            A verificação pode levar minutos; se atualizar a página, &quot;Verificando…&quot; continua correto até terminar.
           </p>
         </div>
         <button
@@ -238,7 +240,9 @@ export function MonitoramentoEmail() {
                       {formatarData(c.lastCheckedAt)}
                     </td>
                     <td className="px-4 py-3">
-                      {c.lastError ? (
+                      {c.checkingInProgress ? (
+                        <span className="text-amber-600 dark:text-amber-400">Verificando…</span>
+                      ) : c.lastError ? (
                         <span className="truncate max-w-[180px] block text-destructive" title={c.lastError}>
                           Erro
                         </span>
@@ -253,10 +257,10 @@ export function MonitoramentoEmail() {
                         <button
                           type="button"
                           onClick={() => verificarMutation.mutate(c.id)}
-                          disabled={verificandoId != null || !c.host || !c.user}
+                          disabled={verificandoId != null || c.checkingInProgress || !c.host || !c.user}
                           className="rounded border border-border bg-muted/50 px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
                         >
-                          {verificandoId === c.id ? "Verificando…" : "Verificar agora"}
+                          {verificandoId === c.id || c.checkingInProgress ? "Verificando…" : "Verificar agora"}
                         </button>
                         <button
                           type="button"
@@ -395,17 +399,17 @@ export function MonitoramentoEmail() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground">
-                  Remetentes (um por linha; vazio = todos)
+                  Remetentes (um por linha). Recorte OAB vem de:
                 </label>
                 <textarea
                   value={remetentesText}
                   onChange={(e) => setRemetentesText(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"
                   rows={2}
-                  placeholder="@recortedigital.adv.br"
+                  placeholder="oabsp@recortedigital.adv.br"
                 />
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Vazio = processa todos os e-mails (incluindo encaminhados). Preencha só se quiser filtrar por remetente.
+                  Use o remetente de onde vêm as publicações (ex.: oabsp@recortedigital.adv.br). Vazio = processa todos.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
