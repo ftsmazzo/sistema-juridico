@@ -117,7 +117,11 @@ export async function runEmailCheck(
       if (itens.length > 0) {
         console.log(`  Recorte encontrado em e-mail "${email.subject?.slice(0, 50)}": ${itens.length} publicação(ões)`);
       }
+      const dateEmailIso = email.date instanceof Date ? email.date.toISOString() : undefined;
       for (const item of itens) {
+        if (dateEmailIso && !(item as { date?: string }).date) {
+          (item as { date?: string }).date = dateEmailIso;
+        }
         const result = await processarItemPublicacaoOab(item);
         if (result.publicacaoId) {
           publicacoesCriadas++;
