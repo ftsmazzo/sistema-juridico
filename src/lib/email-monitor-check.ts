@@ -27,7 +27,10 @@ export function isCheckingInProgress(contaId: number): boolean {
   return checkingInProgressIds.has(contaId);
 }
 
-export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
+export async function runEmailCheck(
+  contaId?: number,
+  options?: { sinceDays?: number }
+): Promise<CheckResult> {
   const [conta] = await db
     .select()
     .from(contaEmailMonitoramento)
@@ -75,8 +78,9 @@ export async function runEmailCheck(contaId?: number): Promise<CheckResult> {
       ? conta.remetentesFiltro
       : undefined;
 
-  // Primeira verificação (nunca rodou): 30 dias. Depois: só últimos 3 dias (já fez varredura geral).
-  const sinceDays = conta.lastCheckedAt != null ? 3 : 30;
+  // Primeira verificação (nunca rodou): 30 dias. Depois: só últimos 3 dias. options.sinceDays força o período (ex.: 30).
+  const sinceDays =
+    options?.sinceDays ?? (conta.lastCheckedAt != null ? 3 : 30);
 
   checkingInProgressIds.add(conta.id);
   try {

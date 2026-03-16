@@ -85,7 +85,7 @@ export function Publicacoes() {
                     Resumo
                   </th>
                   <th className="px-4 py-3 font-medium text-foreground">
-                    Registro
+                    Data do e-mail
                   </th>
                 </tr>
               </thead>
@@ -116,7 +116,7 @@ export function Publicacoes() {
                       {p.resumo || "—"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                      {formatarData(p.createdAt)}
+                      {p.dateEmail ? formatarData(p.dateEmail) : "—"}
                     </td>
                   </tr>
                 ))}

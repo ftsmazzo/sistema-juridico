@@ -8,6 +8,7 @@ export type PublicacaoListItem = {
   id: number;
   subject: string | null;
   dataPublicacao: string | null;
+  dateEmail: string | null;
   tipoPublicacao: string | null;
   numeroProcesso: string | null;
   vara: string | null;
@@ -32,6 +33,7 @@ export async function listPublicacoes(
         id: publicacoesOab.id,
         subject: publicacoesOab.subject,
         dataPublicacao: publicacoesOab.dataPublicacao,
+        dateEmail: publicacoesOab.dateEmail,
         tipoPublicacao: publicacoesOab.tipoPublicacao,
         numeroProcesso: publicacoesOab.numeroProcesso,
         vara: publicacoesOab.vara,
@@ -47,6 +49,7 @@ export async function listPublicacoes(
         id: p.id,
         subject: p.subject,
         dataPublicacao: p.dataPublicacao,
+        dateEmail: p.dateEmail ? p.dateEmail.toISOString() : null,
         tipoPublicacao: p.tipoPublicacao,
         numeroProcesso: p.numeroProcesso,
         vara: p.vara,

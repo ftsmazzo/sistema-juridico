@@ -137,6 +137,7 @@ export type PublicacaoListItem = {
   id: number;
   subject: string | null;
   dataPublicacao: string | null;
+  dateEmail: string | null;
   tipoPublicacao: string | null;
   numeroProcesso: string | null;
   vara: string | null;
@@ -258,14 +259,17 @@ export function putEmailMonitorConfig(body: Partial<EmailMonitorConfig> & { pass
   return api.put<EmailMonitorConfig>("/api/email-monitor/config", body);
 }
 
-/** Verifica uma conta específica ou a primeira ativa. */
-export function postVerificarAgora(contaId?: number) {
+/** Verifica uma conta específica ou a primeira ativa. dias: opcional, ex. 30 para forçar últimos 30 dias. */
+export function postVerificarAgora(contaId?: number, dias?: number) {
+  const body: { contaId?: number; dias?: number } = {};
+  if (contaId != null) body.contaId = contaId;
+  if (dias != null && dias > 0) body.dias = dias;
   return api.post<{
     ok: boolean;
     publicacoesCriadas: number;
     prazosCriados: number;
     emailsProcessados: number;
-  }>("/api/email-monitor/verificar-agora", contaId != null ? { contaId } : {});
+  }>("/api/email-monitor/verificar-agora", body);
 }
 
 /** Cadastra publicação(ões) a partir de imagem (print). Extração por IA no backend. */

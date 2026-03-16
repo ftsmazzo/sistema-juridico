@@ -119,12 +119,13 @@ export function MonitoramentoEmail() {
   });
 
   const verificarMutation = useMutation({
-    mutationFn: (contaId: number) => postVerificarAgora(contaId),
-    onMutate: (contaId) => setVerificandoId(contaId),
+    mutationFn: (opts: { contaId: number; dias?: number }) =>
+      postVerificarAgora(opts.contaId, opts.dias),
+    onMutate: (opts) => setVerificandoId(opts.contaId),
     onSettled: () => setVerificandoId(null),
-    onSuccess: (data, contaId) => {
+    onSuccess: (data, opts) => {
       queryClient.invalidateQueries({ queryKey: ["email-monitor-contas"] });
-      setResultadoId(contaId);
+      setResultadoId(opts.contaId);
       setResultadoMsg(
         `${data.emailsProcessados} e-mail(s), ${data.publicacoesCriadas} publicação(ões) criada(s).`
       );
@@ -256,11 +257,20 @@ export function MonitoramentoEmail() {
                       <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => verificarMutation.mutate(c.id)}
+                          onClick={() => verificarMutation.mutate({ contaId: c.id })}
                           disabled={verificandoId != null || c.checkingInProgress || !c.host || !c.user}
                           className="rounded border border-border bg-muted/50 px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
                         >
                           {verificandoId === c.id || c.checkingInProgress ? "Verificando…" : "Verificar agora"}
+                        </button>
+                        <button
+                          type="button"
+                          title="Buscar e-mails dos últimos 30 dias"
+                          onClick={() => verificarMutation.mutate({ contaId: c.id, dias: 30 })}
+                          disabled={verificandoId != null || c.checkingInProgress || !c.host || !c.user}
+                          className="rounded border border-border bg-muted/50 px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                        >
+                          30 dias
                         </button>
                         <button
                           type="button"
