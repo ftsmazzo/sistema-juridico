@@ -82,7 +82,7 @@ export function Publicacoes() {
                     Data pub.
                   </th>
                   <th className="hidden px-4 py-3 font-medium text-foreground lg:table-cell">
-                    Resumo
+                    OAB(s)
                   </th>
                   <th className="px-4 py-3 font-medium text-foreground">
                     Data do e-mail
@@ -112,8 +112,8 @@ export function Publicacoes() {
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {p.dataPublicacao || "—"}
                     </td>
-                    <td className="hidden max-w-[240px] truncate px-4 py-3 text-muted-foreground lg:table-cell">
-                      {p.resumo || "—"}
+                    <td className="hidden max-w-[220px] truncate px-4 py-3 text-muted-foreground lg:table-cell">
+                      {p.oabs || "—"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {p.dateEmail ? formatarData(p.dateEmail) : "—"}

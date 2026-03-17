@@ -141,7 +141,7 @@ export type PublicacaoListItem = {
   tipoPublicacao: string | null;
   numeroProcesso: string | null;
   vara: string | null;
-  resumo: string | null;
+  oabs: string | null;
   createdAt: string;
 };
 

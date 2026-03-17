@@ -12,7 +12,8 @@ export type PublicacaoListItem = {
   tipoPublicacao: string | null;
   numeroProcesso: string | null;
   vara: string | null;
-  resumo: string | null;
+  /** OAB(s) envolvidas na publicação (advogados nossos): numeroOab + advogados[].oab, sem duplicata. */
+  oabs: string | null;
   createdAt: string;
 };
 
@@ -37,7 +38,8 @@ export async function listPublicacoes(
         tipoPublicacao: publicacoesOab.tipoPublicacao,
         numeroProcesso: publicacoesOab.numeroProcesso,
         vara: publicacoesOab.vara,
-        resumo: publicacoesOab.resumo,
+        numeroOab: publicacoesOab.numeroOab,
+        advogados: publicacoesOab.advogados,
         createdAt: publicacoesOab.createdAt,
       })
       .from(publicacoesOab)
@@ -45,17 +47,26 @@ export async function listPublicacoes(
       .limit(limit);
 
     res.json(
-      list.map((p) => ({
-        id: p.id,
-        subject: p.subject,
-        dataPublicacao: p.dataPublicacao,
-        dateEmail: p.dateEmail ? p.dateEmail.toISOString() : null,
-        tipoPublicacao: p.tipoPublicacao,
-        numeroProcesso: p.numeroProcesso,
-        vara: p.vara,
-        resumo: p.resumo,
-        createdAt: p.createdAt.toISOString(),
-      }))
+      list.map((p) => {
+        const advs = (p.advogados ?? []) as { oab?: string }[];
+        const oabSet = new Set<string>();
+        if (p.numeroOab?.trim()) oabSet.add(p.numeroOab.trim());
+        advs.forEach((a) => {
+          if (a?.oab?.trim()) oabSet.add(a.oab.trim());
+        });
+        const oabs = oabSet.size > 0 ? Array.from(oabSet).sort().join(", ") : null;
+        return {
+          id: p.id,
+          subject: p.subject,
+          dataPublicacao: p.dataPublicacao,
+          dateEmail: p.dateEmail ? p.dateEmail.toISOString() : null,
+          tipoPublicacao: p.tipoPublicacao,
+          numeroProcesso: p.numeroProcesso,
+          vara: p.vara,
+          oabs,
+          createdAt: p.createdAt.toISOString(),
+        };
+      })
     );
   } catch (err) {
     console.error("List publicacoes error:", err);

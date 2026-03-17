@@ -358,6 +358,14 @@ export async function postVerificarAgora(
   const diasNum = typeof body.dias === "number" ? body.dias : parseInt(String(body.dias ?? ""), 10);
   const sinceDays = Number.isInteger(diasNum) && diasNum > 0 && diasNum <= 365 ? diasNum : undefined;
 
+  // Ao pedir 30 dias manualmente: zera lastCheckedAt para essa conta, assim a verificação usa 30 dias de fato.
+  if (sinceDays === 30 && contaId != null) {
+    await db
+      .update(contaEmailMonitoramento)
+      .set({ lastCheckedAt: null, updatedAt: new Date() })
+      .where(eq(contaEmailMonitoramento.id, contaId));
+  }
+
   const result = await runEmailCheck(contaId, sinceDays != null ? { sinceDays } : undefined);
   if (!result.ok && result.erro) {
     res.status(502).json({ error: result.erro });
