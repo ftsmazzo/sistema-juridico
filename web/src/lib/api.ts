@@ -209,9 +209,13 @@ export type PublicacaoListItem = {
   createdAt: string;
 };
 
-export function getPublicacoes(limit?: number) {
-  const q = limit != null ? `?limit=${limit}` : "";
-  return api.get<PublicacaoListItem[]>(`/api/publicacoes${q}`);
+/** exibir: pendentes (padrão, "somem" quando cumpridos) | todas | arquivadas */
+export function getPublicacoes(limit?: number, exibir?: "pendentes" | "todas" | "arquivadas") {
+  const sp = new URLSearchParams();
+  if (limit != null) sp.set("limit", String(limit));
+  if (exibir && exibir !== "pendentes") sp.set("exibir", exibir);
+  const q = sp.toString();
+  return api.get<PublicacaoListItem[]>(`/api/publicacoes${q ? `?${q}` : ""}`);
 }
 
 export type PublicacaoDetalhe = {

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { publicacoesOab, movimentacoes as movimentacoesTable, usuarios, pessoas } from "../db/schema.js";
-import { desc, eq, asc } from "drizzle-orm";
+import { desc, eq, asc, sql } from "drizzle-orm";
 import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
 
 export type PublicacaoListItem = {
@@ -25,8 +25,10 @@ function extrairNumeroOab(oab: string): string {
 
 /**
  * GET /api/publicacoes
- * Query: limit (default 50)
- * Lista publicações OAB ordenadas por criação (mais recente primeiro).
+ * Query: limit (default 50), exibir (pendentes | todas | arquivadas)
+ * - pendentes (padrão): só publicações que ainda têm prazo pendente (ou não têm prazos). Quando todos os prazos são cumpridos, a publicação "some" da lista.
+ * - todas: todas as publicações
+ * - arquivadas: só publicações cujos prazos estão todos cumpridos
  */
 export async function listPublicacoes(
   req: Request,
@@ -34,6 +36,7 @@ export async function listPublicacoes(
 ): Promise<void> {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const exibir = (req.query.exibir as string)?.toLowerCase() || "pendentes";
 
     // OABs dos nossos advogados (usuários ativos + pessoas): conjunto de partes numéricas para match
     // (na publicação pode vir "123456/SP" ou "12345 - SP"; no sistema pode estar "123456" ou "123456/SP")
@@ -49,22 +52,46 @@ export async function listPublicacoes(
       if (num) nossasOabsNumeros.add(num);
     }
 
-    const list = await db
-      .select({
-        id: publicacoesOab.id,
-        subject: publicacoesOab.subject,
-        dataPublicacao: publicacoesOab.dataPublicacao,
-        dateEmail: publicacoesOab.dateEmail,
-        tipoPublicacao: publicacoesOab.tipoPublicacao,
-        numeroProcesso: publicacoesOab.numeroProcesso,
-        vara: publicacoesOab.vara,
-        numeroOab: publicacoesOab.numeroOab,
-        advogados: publicacoesOab.advogados,
-        createdAt: publicacoesOab.createdAt,
-      })
-      .from(publicacoesOab)
-      .orderBy(desc(publicacoesOab.createdAt))
-      .limit(limit);
+    const selectFields = {
+      id: publicacoesOab.id,
+      subject: publicacoesOab.subject,
+      dataPublicacao: publicacoesOab.dataPublicacao,
+      dateEmail: publicacoesOab.dateEmail,
+      tipoPublicacao: publicacoesOab.tipoPublicacao,
+      numeroProcesso: publicacoesOab.numeroProcesso,
+      vara: publicacoesOab.vara,
+      numeroOab: publicacoesOab.numeroOab,
+      advogados: publicacoesOab.advogados,
+      createdAt: publicacoesOab.createdAt,
+    };
+
+    let list;
+    if (exibir === "todas") {
+      list = await db
+        .select(selectFields)
+        .from(publicacoesOab)
+        .orderBy(desc(publicacoesOab.createdAt))
+        .limit(limit);
+    } else if (exibir === "arquivadas") {
+      list = await db
+        .select(selectFields)
+        .from(publicacoesOab)
+        .where(
+          sql`EXISTS (SELECT 1 FROM prazos WHERE prazos.publicacao_oab_id = ${publicacoesOab.id}) AND NOT EXISTS (SELECT 1 FROM prazos WHERE prazos.publicacao_oab_id = ${publicacoesOab.id} AND prazos.status = 0)`
+        )
+        .orderBy(desc(publicacoesOab.createdAt))
+        .limit(limit);
+    } else {
+      // pendentes (padrão): sem prazos OU tem pelo menos um prazo pendente → publicação "some" quando todos cumpridos
+      list = await db
+        .select(selectFields)
+        .from(publicacoesOab)
+        .where(
+          sql`NOT EXISTS (SELECT 1 FROM prazos WHERE prazos.publicacao_oab_id = ${publicacoesOab.id}) OR EXISTS (SELECT 1 FROM prazos WHERE prazos.publicacao_oab_id = ${publicacoesOab.id} AND prazos.status = 0)`
+        )
+        .orderBy(desc(publicacoesOab.createdAt))
+        .limit(limit);
+    }
 
     res.json(
       list.map((p) => {

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getPublicacoes } from "@/lib/api";
@@ -12,10 +13,17 @@ function formatarData(iso: string) {
   });
 }
 
+const EXIBIR_OPCOES = [
+  { value: "pendentes" as const, label: "Pendentes (com prazo em aberto)" },
+  { value: "todas" as const, label: "Todas" },
+  { value: "arquivadas" as const, label: "Arquivadas (todos cumpridos)" },
+];
+
 export function Publicacoes() {
+  const [exibir, setExibir] = useState<"pendentes" | "todas" | "arquivadas">("pendentes");
   const { data: list = [], isPending, isError } = useQuery({
-    queryKey: ["publicacoes"],
-    queryFn: () => getPublicacoes(100),
+    queryKey: ["publicacoes", exibir],
+    queryFn: () => getPublicacoes(100, exibir),
   });
 
   return (
@@ -26,10 +34,25 @@ export function Publicacoes() {
             Publicações
           </h2>
           <p className="text-muted-foreground">
-            Publicações OAB (Recorte Digital) recebidas e processadas.
+            Publicações OAB (Recorte Digital) recebidas e processadas. Por padrão aparecem só as com prazo em aberto.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Exibir:</span>
+            <select
+              value={exibir}
+              onChange={(e) => setExibir(e.target.value as "pendentes" | "todas" | "arquivadas")}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {EXIBIR_OPCOES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
           <Link
             to="/publicacoes/testar-email"
             className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
@@ -42,6 +65,7 @@ export function Publicacoes() {
           >
             Nova publicação
           </Link>
+          </div>
         </div>
       </div>
 
