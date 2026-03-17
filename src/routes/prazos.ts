@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { prazos, publicacoesOab, movimentacoes, prazoSubtarefas } from "../db/schema.js";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { sugerirSubtarefasParaPrazo } from "../lib/sugerir-subtarefas-ia.js";
+import type { RequestWithUser } from "../middleware/auth.js";
 
 export type PrazoListItem = {
   id: number;
@@ -89,6 +90,8 @@ export type PrazoDetalhe = {
   resumoMovimentacao: string | null;
   publicacaoOabId: number | null;
   processoId: number | null;
+  /** Link da peça/documento que deu cumprimento (ex.: OneDrive). */
+  linkPeca: string | null;
   subtarefas: PrazoSubtarefaItem[];
 };
 
@@ -119,6 +122,7 @@ export async function getPrazoById(
         conteudo: prazos.conteudo,
         publicacaoOabId: prazos.publicacaoOabId,
         processoId: prazos.processoId,
+        linkPeca: prazos.linkPeca,
         resumo: publicacoesOab.resumo,
         movTipo: movimentacoes.tipo,
         movResumo: movimentacoes.resumo,
@@ -166,11 +170,142 @@ export async function getPrazoById(
       resumoMovimentacao: row.movResumo ?? null,
       publicacaoOabId: row.publicacaoOabId,
       processoId: row.processoId,
+      linkPeca: row.linkPeca ?? null,
       subtarefas,
     });
   } catch (err) {
     console.error("Get prazo by id error:", err);
     res.status(500).json({ error: "Erro ao buscar prazo" });
+  }
+}
+
+/**
+ * PATCH /api/prazos/:id
+ * Body: { cumprido?: boolean, linkPeca?: string }. Requer autenticação.
+ * cumprido: true marca o prazo como cumprido (status = id do usuário, dataCumprido, dataHoraCumprido).
+ * linkPeca: link da peça/documento (ex.: OneDrive) que deu cumprimento.
+ */
+export async function updatePrazo(
+  req: RequestWithUser,
+  res: Response<PrazoDetalhe | { error: string }>
+): Promise<void> {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (!Number.isInteger(id) || id < 1) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    if (!req.user) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+    const body = (req.body || {}) as { cumprido?: boolean; linkPeca?: string | null };
+
+    const [existing] = await db
+      .select({
+        id: prazos.id,
+        status: prazos.status,
+        linkPeca: prazos.linkPeca,
+      })
+      .from(prazos)
+      .where(eq(prazos.id, id))
+      .limit(1);
+
+    if (!existing) {
+      res.status(404).json({ error: "Prazo não encontrado" });
+      return;
+    }
+
+    const updates: {
+      status?: number;
+      dataCumprido?: string;
+      dataHoraCumprido?: Date;
+      linkPeca?: string | null;
+      updatedAt?: Date;
+    } = { updatedAt: new Date() };
+
+    if (body.cumprido === true) {
+      updates.status = req.user.id;
+      updates.dataCumprido = new Date().toISOString().slice(0, 10);
+      updates.dataHoraCumprido = new Date();
+    }
+    if (body.linkPeca !== undefined) {
+      const v = typeof body.linkPeca === "string" ? body.linkPeca.trim().slice(0, 1000) : null;
+      updates.linkPeca = v || null;
+    }
+
+    if (Object.keys(updates).length <= 1) {
+      res.status(400).json({ error: "Nenhum campo para atualizar (use cumprido e/ou linkPeca)" });
+      return;
+    }
+
+    await db.update(prazos).set(updates).where(eq(prazos.id, id));
+
+    const [row] = await db
+      .select({
+        id: prazos.id,
+        prazo: prazos.prazo,
+        data: prazos.data,
+        tipo: prazos.tipo,
+        status: prazos.status,
+        numeroProcesso: prazos.numeroProcesso,
+        observacao: prazos.observacao,
+        conteudo: prazos.conteudo,
+        publicacaoOabId: prazos.publicacaoOabId,
+        processoId: prazos.processoId,
+        linkPeca: prazos.linkPeca,
+        resumo: publicacoesOab.resumo,
+        movTipo: movimentacoes.tipo,
+        movResumo: movimentacoes.resumo,
+      })
+      .from(prazos)
+      .leftJoin(publicacoesOab, eq(prazos.publicacaoOabId, publicacoesOab.id))
+      .leftJoin(movimentacoes, eq(prazos.movimentacaoId, movimentacoes.id))
+      .where(eq(prazos.id, id))
+      .limit(1);
+
+    const subtarefasRows = await db
+      .select({
+        id: prazoSubtarefas.id,
+        titulo: prazoSubtarefas.titulo,
+        concluida: prazoSubtarefas.concluida,
+        ordem: prazoSubtarefas.ordem,
+      })
+      .from(prazoSubtarefas)
+      .where(eq(prazoSubtarefas.idPrazo, id))
+      .orderBy(prazoSubtarefas.ordem, prazoSubtarefas.id);
+
+    const subtarefas: PrazoSubtarefaItem[] = subtarefasRows.map((s) => ({
+      id: s.id,
+      titulo: s.titulo,
+      concluida: s.concluida,
+      ordem: s.ordem,
+    }));
+
+    if (!row) {
+      res.status(500).json({ error: "Erro ao retornar prazo atualizado" });
+      return;
+    }
+    res.json({
+      id: row.id,
+      prazo: row.prazo,
+      data: String(row.data),
+      tipo: row.tipo,
+      status: row.status,
+      numeroProcesso: row.numeroProcesso,
+      observacao: row.observacao,
+      conteudo: row.conteudo ?? null,
+      resumoPublicacao: row.resumo ?? null,
+      movimentacaoTipo: row.movTipo ?? null,
+      resumoMovimentacao: row.movResumo ?? null,
+      publicacaoOabId: row.publicacaoOabId,
+      processoId: row.processoId,
+      linkPeca: row.linkPeca ?? null,
+      subtarefas,
+    });
+  } catch (err) {
+    console.error("Update prazo error:", err);
+    res.status(500).json({ error: "Erro ao atualizar prazo" });
   }
 }
 

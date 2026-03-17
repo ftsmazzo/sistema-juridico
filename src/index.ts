@@ -6,6 +6,7 @@ import { getDashboard } from "./routes/dashboard.js";
 import {
   listPrazos,
   getPrazoById,
+  updatePrazo,
   createSubtarefa,
   updateSubtarefa,
   deleteSubtarefa,
@@ -80,6 +81,7 @@ app.get("/api/prazos/link-inscricao", requireAuth, getLinkInscricao);
 app.post("/api/prazos/backfill-usuarios", requireAuth, postBackfillUsuarios);
 app.get("/api/prazos", listPrazos);
 app.get("/api/prazos/:id", optionalAuth, getPrazoById);
+app.patch("/api/prazos/:id", requireAuth, updatePrazo);
 app.post("/api/prazos/:id/subtarefas", requireAuth, createSubtarefa);
 app.post("/api/prazos/:id/sugerir-subtarefas", requireAuth, sugerirSubtarefas);
 app.patch("/api/prazos/:id/subtarefas/:idItem", requireAuth, updateSubtarefa);

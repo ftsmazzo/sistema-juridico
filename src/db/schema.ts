@@ -70,6 +70,8 @@ export const prazos = pgTable("prazos", {
   ),
   processoId: integer("processo_id").references(() => processos.id, { onDelete: "set null" }),
   numeroProcesso: varchar("numero_processo", { length: 100 }),
+  /** Link da peça/documento que deu cumprimento ao prazo (ex.: OneDrive, SharePoint). */
+  linkPeca: varchar("link_peca", { length: 1000 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

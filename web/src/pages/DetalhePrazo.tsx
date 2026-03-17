@@ -3,12 +3,14 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPrazoById,
+  updatePrazo,
   createSubtarefa,
   updateSubtarefa,
   deleteSubtarefa,
   sugerirSubtarefas as apiSugerirSubtarefas,
   type PrazoSubtarefaItem,
 } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 
 function formatarData(data: string | null) {
   if (!data) return "—";
@@ -27,6 +29,8 @@ export function DetalhePrazo() {
   const [sugestoesLoading, setSugestoesLoading] = useState(false);
   const [sugestoesError, setSugestoesError] = useState<string | null>(null);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const [linkPecaInput, setLinkPecaInput] = useState("");
+  const [mostrarVisualizador, setMostrarVisualizador] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: prazo, isPending, error } = useQuery({
@@ -60,6 +64,15 @@ export function DetalhePrazo() {
     mutationFn: (idItem: number) => deleteSubtarefa(prazoId, idItem),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prazo", prazoId] });
+    },
+  });
+
+  const updatePrazoMutation = useMutation({
+    mutationFn: (body: { cumprido?: boolean; linkPeca?: string | null }) =>
+      updatePrazo(prazoId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prazo", prazoId] });
+      setLinkPecaInput("");
     },
   });
 
@@ -181,7 +194,114 @@ export function DetalhePrazo() {
         {prazo.observacao?.trim() && (
           <p className="mt-2 text-sm text-muted-foreground">{prazo.observacao}</p>
         )}
+
+        {/* Dar cumprimento (logado e prazo pendente) */}
+        {prazo.status === 0 && getUser() && (
+          <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <h3 className="mb-2 text-sm font-semibold text-foreground">Dar cumprimento ao prazo</h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Opcional: informe o link da peça no OneDrive (ou outro) para anexar ao cumprimento.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <input
+                type="url"
+                value={linkPecaInput}
+                onChange={(e) => setLinkPecaInput(e.target.value)}
+                placeholder="https://... (OneDrive, SharePoint, etc.)"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  updatePrazoMutation.mutate({
+                    cumprido: true,
+                    linkPeca: linkPecaInput.trim() || undefined,
+                  })
+                }
+                disabled={updatePrazoMutation.isPending}
+                className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {updatePrazoMutation.isPending ? "Salvando…" : "Marcar como cumprido"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Documento anexado (peça) + visualizador */}
+        {prazo.status !== 0 && prazo.linkPeca?.trim() && (
+          <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <h3 className="mb-2 text-sm font-semibold text-foreground">Documento anexado (peça)</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={prazo.linkPeca}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate text-sm text-primary hover:underline max-w-[280px] sm:max-w-none"
+                title={prazo.linkPeca}
+              >
+                {prazo.linkPeca}
+              </a>
+              <button
+                type="button"
+                onClick={() => setMostrarVisualizador(true)}
+                className="rounded border border-border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+              >
+                Visualizar no sistema
+              </button>
+              <a
+                href={prazo.linkPeca}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded border border-border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+              >
+                Abrir em nova aba
+              </a>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modal visualizador de documento (iframe) */}
+      {mostrarVisualizador && prazo.linkPeca?.trim() && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Visualizar documento"
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-2">
+            <span className="text-sm font-medium text-foreground">Documento (peça)</span>
+            <div className="flex gap-2">
+              <a
+                href={prazo.linkPeca!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
+              >
+                Abrir em nova aba
+              </a>
+              <button
+                type="button"
+                onClick={() => setMostrarVisualizador(false)}
+                className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 p-2">
+            <iframe
+              title="Documento da peça"
+              src={prazo.linkPeca!}
+              className="h-full w-full rounded border border-border bg-white"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            />
+          </div>
+          <p className="shrink-0 px-4 py-1 text-center text-xs text-muted-foreground">
+            Se o documento não carregar aqui (OneDrive pode bloquear incorporação), use &quot;Abrir em nova aba&quot;.
+          </p>
+        </div>
+      )}
 
       {/* Resumo / contexto (da publicação e movimentação) */}
       {temResumo && (

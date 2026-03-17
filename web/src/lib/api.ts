@@ -157,11 +157,20 @@ export type PrazoDetalhe = {
   resumoMovimentacao: string | null;
   publicacaoOabId: number | null;
   processoId: number | null;
+  linkPeca: string | null;
   subtarefas: PrazoSubtarefaItem[];
 };
 
 export function getPrazoById(id: number) {
   return api.get<PrazoDetalhe>(`/api/prazos/${id}`);
+}
+
+/** Atualiza prazo: cumprido (marca com seu usuário) e/ou link da peça (OneDrive, etc.). */
+export function updatePrazo(
+  id: number,
+  body: { cumprido?: boolean; linkPeca?: string | null }
+) {
+  return api.patch<PrazoDetalhe>(`/api/prazos/${id}`, body);
 }
 
 export function createSubtarefa(prazoId: number, titulo: string) {
