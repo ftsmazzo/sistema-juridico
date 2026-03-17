@@ -130,10 +130,13 @@ export async function runEmailCheck(
             const analiseResult = await executarAnaliseN8nParaPublicacao(result.publicacaoId);
             if (analiseResult.analiseGravada) {
               prazosCriados += analiseResult.prazosCriados;
-              notificarPublicacoes.push({
-                publicacaoId: result.publicacaoId,
-                prazosCriados: analiseResult.prazosCriados,
-              });
+              // WhatsApp só quando a publicação foi criada nesta verificação (não renotificar publicações já conhecidas)
+              if (result.criadaAgora) {
+                notificarPublicacoes.push({
+                  publicacaoId: result.publicacaoId,
+                  prazosCriados: analiseResult.prazosCriados,
+                });
+              }
             }
             if (!analiseResult.ok && analiseResult.erro) {
               console.error(`IA publicação ${result.publicacaoId}:`, analiseResult.erro);

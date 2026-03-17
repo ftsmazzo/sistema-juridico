@@ -105,7 +105,7 @@ async function enriquecerPublicacaoExistente(
 
 export async function processarItemPublicacaoOab(
   item: ItemPublicacaoOab
-): Promise<{ publicacaoId?: number; prazoIds?: number[]; skipped?: string }> {
+): Promise<{ publicacaoId?: number; prazoIds?: number[]; skipped?: string; criadaAgora?: boolean }> {
   if (!item.isRecorteDigital || item.publicacaoNumero == null) {
     return {};
   }
@@ -140,7 +140,7 @@ export async function processarItemPublicacaoOab(
       .limit(1);
     if (existenteProcesso) {
       await enriquecerPublicacaoExistente(existenteProcesso.id, item);
-      return { publicacaoId: existenteProcesso.id };
+      return { publicacaoId: existenteProcesso.id, criadaAgora: false };
     }
   }
 
@@ -187,6 +187,7 @@ export async function processarItemPublicacaoOab(
 
   const publicacaoId = pub?.id;
   if (!publicacaoId) return {};
+  const criadaAgora = true;
 
   const respostaIa = {
     resumo: item.resumo ?? undefined,
@@ -302,6 +303,7 @@ export async function processarItemPublicacaoOab(
     return {
       publicacaoId,
       prazoIds: prazoIds.length > 0 ? prazoIds : undefined,
+      criadaAgora,
     };
   }
 
@@ -426,6 +428,7 @@ export async function processarItemPublicacaoOab(
   return {
     publicacaoId,
     prazoIds: prazoIds.length > 0 ? prazoIds : undefined,
+    criadaAgora,
   };
 }
 
