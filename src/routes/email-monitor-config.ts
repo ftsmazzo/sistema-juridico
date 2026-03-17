@@ -351,12 +351,12 @@ export async function postVerificarAgora(
     return;
   }
 
-  const body = (req.body || {}) as { contaId?: number; dias?: number };
+  const body = (req.body || {}) as { contaId?: number; dias?: number | string };
   const contaId = typeof body.contaId === "number" && Number.isInteger(body.contaId)
     ? body.contaId
     : undefined;
-  const sinceDays =
-    typeof body.dias === "number" && body.dias > 0 && body.dias <= 365 ? body.dias : undefined;
+  const diasNum = typeof body.dias === "number" ? body.dias : parseInt(String(body.dias ?? ""), 10);
+  const sinceDays = Number.isInteger(diasNum) && diasNum > 0 && diasNum <= 365 ? diasNum : undefined;
 
   const result = await runEmailCheck(contaId, sinceDays != null ? { sinceDays } : undefined);
   if (!result.ok && result.erro) {

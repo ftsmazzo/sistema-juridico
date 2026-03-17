@@ -263,7 +263,7 @@ export function putEmailMonitorConfig(body: Partial<EmailMonitorConfig> & { pass
 export function postVerificarAgora(contaId?: number, dias?: number) {
   const body: { contaId?: number; dias?: number } = {};
   if (contaId != null) body.contaId = contaId;
-  if (dias != null && dias > 0) body.dias = dias;
+  if (dias != null && dias > 0) body.dias = Number(dias);
   return api.post<{
     ok: boolean;
     publicacoesCriadas: number;
