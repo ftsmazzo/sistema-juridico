@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { publicacoesOab, movimentacoes as movimentacoesTable, usuarios, pessoas } from "../db/schema.js";
 import { desc, eq, asc } from "drizzle-orm";
-import { criarPrazosAPartirDePublicacao, normalizarOab } from "../lib/processar-publicacao-oab.js";
+import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
 
 export type PublicacaoListItem = {
   id: number;
@@ -35,15 +35,18 @@ export async function listPublicacoes(
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
 
-    // OABs dos nossos advogados (usuários ativos + pessoas cadastradas), normalizadas para comparação
+    // OABs dos nossos advogados (usuários ativos + pessoas): conjunto de partes numéricas para match
+    // (na publicação pode vir "123456/SP" ou "12345 - SP"; no sistema pode estar "123456" ou "123456/SP")
     const [usuariosOabs, pessoasOabs] = await Promise.all([
       db.select({ numeroOab: usuarios.numeroOab }).from(usuarios).where(eq(usuarios.ativo, true)),
       db.select({ numeroOab: pessoas.numeroOab }).from(pessoas),
     ]);
-    const nossasOabsNorm = new Set<string>();
+    const nossasOabsNumeros = new Set<string>();
     for (const r of [...usuariosOabs, ...pessoasOabs]) {
-      const n = normalizarOab(r.numeroOab ?? "");
-      if (n) nossasOabsNorm.add(n);
+      const raw = (r.numeroOab ?? "").trim();
+      if (!raw) continue;
+      const num = extrairNumeroOab(raw);
+      if (num) nossasOabsNumeros.add(num);
     }
 
     const list = await db
@@ -71,12 +74,12 @@ export async function listPublicacoes(
         advs.forEach((a) => {
           if (a?.oab?.trim()) textosOab.push(a.oab.trim());
         });
-        // Manter apenas OABs que pertencem aos nossos advogados (normalizadas)
+        // Manter apenas OABs cuja parte numérica está entre as dos nossos advogados
         const numerosNossos = new Set<string>();
         for (const texto of textosOab) {
-          const norm = normalizarOab(texto);
-          if (norm && nossasOabsNorm.has(norm)) {
-            numerosNossos.add(extrairNumeroOab(texto));
+          const num = extrairNumeroOab(texto);
+          if (num && nossasOabsNumeros.has(num)) {
+            numerosNossos.add(num);
           }
         }
         const oabs = numerosNossos.size > 0 ? Array.from(numerosNossos).sort().join(", ") : null;
