@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import { db } from "../db/index.js";
-import { publicacoesOab, movimentacoes as movimentacoesTable } from "../db/schema.js";
+import { publicacoesOab, movimentacoes as movimentacoesTable, usuarios, pessoas } from "../db/schema.js";
 import { desc, eq, asc } from "drizzle-orm";
-import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
+import { criarPrazosAPartirDePublicacao, normalizarOab } from "../lib/processar-publicacao-oab.js";
 
 export type PublicacaoListItem = {
   id: number;
@@ -12,10 +12,16 @@ export type PublicacaoListItem = {
   tipoPublicacao: string | null;
   numeroProcesso: string | null;
   vara: string | null;
-  /** OAB(s) envolvidas na publicação (advogados nossos): numeroOab + advogados[].oab, sem duplicata. */
+  /** OAB(s) dos nossos advogados na publicação: apenas números, separados por vírgula. */
   oabs: string | null;
   createdAt: string;
 };
+
+/** Extrai apenas a parte numérica da OAB para exibição (ex.: "12345/SP" ou "SP 12345" → "12345"). */
+function extrairNumeroOab(oab: string): string {
+  const apenasNumeros = oab.replace(/\D/g, "");
+  return apenasNumeros || oab.trim();
+}
 
 /**
  * GET /api/publicacoes
@@ -28,6 +34,17 @@ export async function listPublicacoes(
 ): Promise<void> {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+    // OABs dos nossos advogados (usuários ativos + pessoas cadastradas), normalizadas para comparação
+    const [usuariosOabs, pessoasOabs] = await Promise.all([
+      db.select({ numeroOab: usuarios.numeroOab }).from(usuarios).where(eq(usuarios.ativo, true)),
+      db.select({ numeroOab: pessoas.numeroOab }).from(pessoas),
+    ]);
+    const nossasOabsNorm = new Set<string>();
+    for (const r of [...usuariosOabs, ...pessoasOabs]) {
+      const n = normalizarOab(r.numeroOab ?? "");
+      if (n) nossasOabsNorm.add(n);
+    }
 
     const list = await db
       .select({
@@ -49,12 +66,20 @@ export async function listPublicacoes(
     res.json(
       list.map((p) => {
         const advs = (p.advogados ?? []) as { oab?: string }[];
-        const oabSet = new Set<string>();
-        if (p.numeroOab?.trim()) oabSet.add(p.numeroOab.trim());
+        const textosOab: string[] = [];
+        if (p.numeroOab?.trim()) textosOab.push(p.numeroOab.trim());
         advs.forEach((a) => {
-          if (a?.oab?.trim()) oabSet.add(a.oab.trim());
+          if (a?.oab?.trim()) textosOab.push(a.oab.trim());
         });
-        const oabs = oabSet.size > 0 ? Array.from(oabSet).sort().join(", ") : null;
+        // Manter apenas OABs que pertencem aos nossos advogados (normalizadas)
+        const numerosNossos = new Set<string>();
+        for (const texto of textosOab) {
+          const norm = normalizarOab(texto);
+          if (norm && nossasOabsNorm.has(norm)) {
+            numerosNossos.add(extrairNumeroOab(texto));
+          }
+        }
+        const oabs = numerosNossos.size > 0 ? Array.from(numerosNossos).sort().join(", ") : null;
         return {
           id: p.id,
           subject: p.subject,

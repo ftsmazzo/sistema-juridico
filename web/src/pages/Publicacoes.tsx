@@ -81,7 +81,7 @@ export function Publicacoes() {
                   <th className="px-4 py-3 font-medium text-foreground">
                     Data pub.
                   </th>
-                  <th className="hidden px-4 py-3 font-medium text-foreground lg:table-cell">
+                  <th className="hidden px-4 py-3 font-medium text-foreground lg:table-cell" title="Apenas números dos nossos advogados cadastrados no sistema">
                     OAB(s)
                   </th>
                   <th className="px-4 py-3 font-medium text-foreground">
