@@ -4,7 +4,7 @@
 import { db } from "../db/index.js";
 import { contaEmailMonitoramento } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { runEmailCheck } from "./email-monitor-check.js";
+import { runEmailCheck, isCheckingInProgress } from "./email-monitor-check.js";
 
 const INTERVAL_MS = 60 * 1000;
 
@@ -21,6 +21,7 @@ export function startEmailMonitorScheduler(): void {
         .where(eq(contaEmailMonitoramento.ativo, true));
       const now = Date.now();
       for (const conta of contas) {
+        if (isCheckingInProgress(conta.id)) continue;
         const last = conta.lastCheckedAt ? conta.lastCheckedAt.getTime() : 0;
         const intervalMs = conta.intervalMinutes * 60 * 1000;
         if (now - last >= intervalMs) {

@@ -67,14 +67,24 @@ export async function fetchRecentEmails(
   try {
     const lock = await client.getMailboxLock(INBOX);
     try {
-      const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+      // Data "desde" em UTC (meia-noite), N dias atrás — IMAP usa só o dia; evita perda por fuso.
+      const nowUtc = new Date();
+      const sinceDate = new Date(Date.UTC(
+        nowUtc.getUTCFullYear(),
+        nowUtc.getUTCMonth(),
+        nowUtc.getUTCDate() - sinceDays,
+        0, 0, 0, 0
+      ));
       const uids = await client.search({ since: sinceDate }, { uid: true });
-      // Apenas UIDs numéricos (Yahoo e outros podem devolver formato diferente)
       const numericUids = (Array.isArray(uids) ? uids : [])
         .map((u) => (typeof u === "number" ? u : Number(u)))
         .filter((n) => Number.isInteger(n) && n > 0);
       const sorted = [...new Set(numericUids)].sort((a, b) => a - b);
+      const totalEncontrados = sorted.length;
       const toFetch = sorted.slice(-MAX_MESSAGES);
+      console.log(
+        `IMAP: pedido since ${sinceDays} dias (desde ${sinceDate.toISOString().slice(0, 10)}), UIDs no servidor: ${totalEncontrados}, buscando: ${toFetch.length}`
+      );
       if (toFetch.length === 0) return results;
 
       // FETCH por UID: o 3º parâmetro (options) deve ter { uid: true }, senão o servidor trata o range como sequence number e falha.
@@ -133,5 +143,13 @@ export async function fetchRecentEmails(
     await client.logout();
   }
 
+  if (results.length > 0) {
+    const dates = results.map((r) => r.date.getTime());
+    const minD = new Date(Math.min(...dates));
+    const maxD = new Date(Math.max(...dates));
+    console.log(
+      `IMAP: e-mails recebidos com datas entre ${minD.toISOString().slice(0, 10)} e ${maxD.toISOString().slice(0, 10)} (${results.length} no total)`
+    );
+  }
   return results;
 }
