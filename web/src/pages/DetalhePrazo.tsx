@@ -6,7 +6,6 @@ import {
   createSubtarefa,
   updateSubtarefa,
   deleteSubtarefa,
-  type PrazoDetalhe,
   type PrazoSubtarefaItem,
 } from "@/lib/api";
 
