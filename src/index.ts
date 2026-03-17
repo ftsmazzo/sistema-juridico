@@ -9,6 +9,7 @@ import {
   createSubtarefa,
   updateSubtarefa,
   deleteSubtarefa,
+  sugerirSubtarefas,
 } from "./routes/prazos.js";
 import { getExportIcs, getFeedIcs, getLinkInscricao, postBackfillUsuarios } from "./routes/prazos-ical.js";
 import {
@@ -80,6 +81,7 @@ app.post("/api/prazos/backfill-usuarios", requireAuth, postBackfillUsuarios);
 app.get("/api/prazos", listPrazos);
 app.get("/api/prazos/:id", requireAuth, getPrazoById);
 app.post("/api/prazos/:id/subtarefas", requireAuth, createSubtarefa);
+app.post("/api/prazos/:id/sugerir-subtarefas", requireAuth, sugerirSubtarefas);
 app.patch("/api/prazos/:id/subtarefas/:idItem", requireAuth, updateSubtarefa);
 app.delete("/api/prazos/:id/subtarefas/:idItem", requireAuth, deleteSubtarefa);
 app.get("/api/publicacoes", listPublicacoes);

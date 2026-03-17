@@ -176,6 +176,13 @@ export function deleteSubtarefa(prazoId: number, idItem: number) {
   return api.delete<{ ok: boolean }>(`/api/prazos/${prazoId}/subtarefas/${idItem}`);
 }
 
+/** Sugere itens de checklist com base na publicação e no processo (IA). */
+export function sugerirSubtarefas(prazoId: number) {
+  return api.post<{ ok: boolean; itens: { titulo: string }[] }>(
+    `/api/prazos/${prazoId}/sugerir-subtarefas`
+  );
+}
+
 /** Lista publicações OAB (mais recentes primeiro). limit opcional (default 50, máx 200). */
 export type PublicacaoListItem = {
   id: number;

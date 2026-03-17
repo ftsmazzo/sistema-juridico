@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { prazos, publicacoesOab, movimentacoes, prazoSubtarefas } from "../db/schema.js";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { sugerirSubtarefasParaPrazo } from "../lib/sugerir-subtarefas-ia.js";
 
 export type PrazoListItem = {
   id: number;
@@ -304,5 +305,33 @@ export async function deleteSubtarefa(
   } catch (err) {
     console.error("Delete subtarefa error:", err);
     res.status(500).json({ error: "Erro ao excluir subtarefa" });
+  }
+}
+
+/**
+ * POST /api/prazos/:id/sugerir-subtarefas
+ * Usa contexto da publicação (e do processo se vinculado) para sugerir itens de checklist via IA.
+ * Resposta: { ok: true, itens: [ { titulo: string }, ... ] } ou { error: string }
+ */
+export async function sugerirSubtarefas(
+  req: Request,
+  res: Response<{ ok: boolean; itens: { titulo: string }[] } | { error: string }>
+): Promise<void> {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (!Number.isInteger(id) || id < 1) {
+      res.status(400).json({ error: "ID do prazo inválido" });
+      return;
+    }
+
+    const resultado = await sugerirSubtarefasParaPrazo(id);
+    if (!resultado.ok) {
+      res.status(502).json({ error: resultado.erro ?? "Erro ao sugerir passos" });
+      return;
+    }
+    res.json({ ok: true, itens: resultado.itens });
+  } catch (err) {
+    console.error("Sugerir subtarefas error:", err);
+    res.status(500).json({ error: "Erro ao sugerir passos" });
   }
 }

@@ -6,6 +6,7 @@ import {
   createSubtarefa,
   updateSubtarefa,
   deleteSubtarefa,
+  sugerirSubtarefas as apiSugerirSubtarefas,
   type PrazoSubtarefaItem,
 } from "@/lib/api";
 
@@ -22,6 +23,10 @@ export function DetalhePrazo() {
   const { id } = useParams<{ id: string }>();
   const prazoId = id ? parseInt(id, 10) : NaN;
   const [novoTitulo, setNovoTitulo] = useState("");
+  const [sugestoes, setSugestoes] = useState<{ titulo: string }[]>([]);
+  const [sugestoesLoading, setSugestoesLoading] = useState(false);
+  const [sugestoesError, setSugestoesError] = useState<string | null>(null);
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
 
   const queryClient = useQueryClient();
   const { data: prazo, isPending, error } = useQuery({
@@ -72,6 +77,34 @@ export function DetalhePrazo() {
   const handleRemoverSubtarefa = (idItem: number) => {
     if (deleteMutation.isPending) return;
     if (window.confirm("Remover este item da lista?")) deleteMutation.mutate(idItem);
+  };
+
+  const handleSugerirComIa = async () => {
+    setSugestoesError(null);
+    setSugestoesLoading(true);
+    setMostrarSugestoes(false);
+    try {
+      const data = await apiSugerirSubtarefas(prazoId);
+      setSugestoes(data.itens ?? []);
+      setMostrarSugestoes(true);
+    } catch (e) {
+      setSugestoesError(e instanceof Error ? e.message : "Erro ao sugerir passos.");
+      setSugestoes([]);
+    } finally {
+      setSugestoesLoading(false);
+    }
+  };
+
+  const handleAdicionarSugestao = (titulo: string) => {
+    createMutation.mutate(titulo);
+    setSugestoes((prev) => prev.filter((s) => s.titulo !== titulo));
+  };
+
+  const handleAdicionarTodasSugestoes = () => {
+    sugestoes.forEach((s) => createMutation.mutate(s.titulo));
+    setSugestoes([]);
+    setMostrarSugestoes(false);
+    queryClient.invalidateQueries({ queryKey: ["prazo", prazoId] });
   };
 
   if (!Number.isInteger(prazoId) || prazoId < 1) {
@@ -194,12 +227,64 @@ export function DetalhePrazo() {
 
       {/* Checklist (subtarefas) */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold text-foreground">
-          Passos para execução (checklist)
-        </h2>
-        <p className="mb-4 text-xs text-muted-foreground">
-          Marque os itens conforme for cumprindo. Use para padronizar processos.
-        </p>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">
+              Passos para execução (checklist)
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Marque os itens conforme for cumprindo. Use para padronizar processos.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSugerirComIa}
+            disabled={sugestoesLoading}
+            className="shrink-0 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            {sugestoesLoading ? "Gerando…" : "Sugerir passos com IA"}
+          </button>
+        </div>
+        {sugestoesError && (
+          <p className="mb-3 text-sm text-destructive">{sugestoesError}</p>
+        )}
+        {mostrarSugestoes && sugestoes.length > 0 && (
+          <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <p className="mb-2 text-xs font-medium text-foreground">
+              Passos sugeridos (com base na publicação e no processo):
+            </p>
+            <ul className="space-y-1.5">
+              {sugestoes.map((s, idx) => (
+                <li key={idx} className="flex items-center gap-2 text-sm">
+                  <span className="flex-1 text-foreground">{s.titulo}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAdicionarSugestao(s.titulo)}
+                    className="shrink-0 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-muted"
+                  >
+                    Adicionar
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={handleAdicionarTodasSugestoes}
+                className="rounded border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Adicionar todos
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMostrarSugestoes(false); setSugestoes([]); }}
+                className="rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
 
         <ul className="space-y-2">
           {prazo.subtarefas.map((item) => (
