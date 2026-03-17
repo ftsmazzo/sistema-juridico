@@ -163,36 +163,37 @@ export function Prazos() {
           >
             Obter link de inscrição
           </button>
-          {linkUrl && (
-          <>
-            <div className="flex w-full flex-1 basis-full items-center gap-2 md:w-auto md:flex-1">
-              <input
-                type="text"
-                readOnly
-                value={linkUrl}
-                className="min-w-0 flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-mono"
-              />
-              <button
-                type="button"
-                onClick={handleCopiarLink}
-                className="shrink-0 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm font-medium hover:bg-muted"
-              >
-                {copiado ? "Copiado!" : "Copiar"}
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              No Google Calendar: Outros calendários → Inscrever-se por URL. No Outlook: Adicionar
-              calendário → Assinar da Web. Cole o link acima.
-            </p>
-            {typeof totalPrazos === "number" && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {totalPrazos === 0
-                  ? "Você não tem prazos vinculados ao seu usuário (por OAB). O feed mostrará todos os prazos do sistema até haver vínculos."
-                  : `Seu link contém ${totalPrazos} prazo(s) no momento.`}
+          {linkUrl ? (
+            <div className="flex w-full flex-1 basis-full flex-col gap-2">
+              <div className="flex w-full items-center gap-2 md:flex-1">
+                <input
+                  type="text"
+                  readOnly
+                  value={linkUrl}
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopiarLink}
+                  className="shrink-0 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  {copiado ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                No Google Calendar: Outros calendários → Inscrever-se por URL. No Outlook: Adicionar
+                calendário → Assinar da Web. Cole o link acima.
               </p>
-            )}
-          </>
-        )}
+              {typeof totalPrazos === "number" && (
+                <p className="text-xs text-muted-foreground">
+                  {totalPrazos === 0
+                    ? "Você não tem prazos vinculados ao seu usuário (por OAB). O feed mostrará todos os prazos do sistema até haver vínculos."
+                    : `Seu link contém ${totalPrazos} prazo(s) no momento.`}
+                </p>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Filtros */}
