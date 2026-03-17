@@ -87,6 +87,18 @@ export const prazosUsuarios = pgTable(
   }
 );
 
+// --- Subtarefas do prazo (checklist para execução) ---
+export const prazoSubtarefas = pgTable("prazo_subtarefas", {
+  id: serial("id").primaryKey(),
+  idPrazo: integer("id_prazo")
+    .notNull()
+    .references(() => prazos.id, { onDelete: "cascade" }),
+  titulo: varchar("titulo", { length: 500 }).notNull(),
+  concluida: boolean("concluida").notNull().default(false),
+  ordem: integer("ordem").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // --- Audiências ---
 export const audiencias = pgTable("audiencias", {
   id: serial("id").primaryKey(),
@@ -414,6 +426,14 @@ export const prazosRelations = relations(prazos, ({ one, many }) => ({
     references: [processos.id],
   }),
   prazosUsuarios: many(prazosUsuarios),
+  subtarefas: many(prazoSubtarefas),
+}));
+
+export const prazoSubtarefasRelations = relations(prazoSubtarefas, ({ one }) => ({
+  prazo: one(prazos, {
+    fields: [prazoSubtarefas.idPrazo],
+    references: [prazos.id],
+  }),
 }));
 
 export const movimentacoesRelations = relations(movimentacoes, ({ one, many }) => ({

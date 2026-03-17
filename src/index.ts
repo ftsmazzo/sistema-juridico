@@ -3,7 +3,13 @@ import cors from "cors";
 import express from "express";
 import { handlePublicacoesOab } from "./routes/webhooks/publicacoes-oab.js";
 import { getDashboard } from "./routes/dashboard.js";
-import { listPrazos } from "./routes/prazos.js";
+import {
+  listPrazos,
+  getPrazoById,
+  createSubtarefa,
+  updateSubtarefa,
+  deleteSubtarefa,
+} from "./routes/prazos.js";
 import { getExportIcs, getFeedIcs, getLinkInscricao, postBackfillUsuarios } from "./routes/prazos-ical.js";
 import {
   listPublicacoes,
@@ -72,6 +78,10 @@ app.get("/api/prazos/feed.ics", getFeedIcs);
 app.get("/api/prazos/link-inscricao", requireAuth, getLinkInscricao);
 app.post("/api/prazos/backfill-usuarios", requireAuth, postBackfillUsuarios);
 app.get("/api/prazos", listPrazos);
+app.get("/api/prazos/:id", requireAuth, getPrazoById);
+app.post("/api/prazos/:id/subtarefas", requireAuth, createSubtarefa);
+app.patch("/api/prazos/:id/subtarefas/:idItem", requireAuth, updateSubtarefa);
+app.delete("/api/prazos/:id/subtarefas/:idItem", requireAuth, deleteSubtarefa);
 app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);

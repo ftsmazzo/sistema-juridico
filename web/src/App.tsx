@@ -3,6 +3,7 @@ import { Layout } from "@/components/layout/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Dashboard } from "@/pages/Dashboard";
 import { Prazos } from "@/pages/Prazos";
+import { DetalhePrazo } from "@/pages/DetalhePrazo";
 import { Publicacoes } from "@/pages/Publicacoes";
 import { DetalhePublicacao } from "@/pages/DetalhePublicacao";
 import { NovaPublicacao } from "@/pages/NovaPublicacao";
@@ -31,6 +32,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="prazos" element={<Prazos />} />
+          <Route path="prazos/:id" element={<DetalhePrazo />} />
           <Route path="publicacoes" element={<Publicacoes />} />
           <Route path="publicacoes/nova" element={<NovaPublicacao />} />
           <Route path="publicacoes/testar-email" element={<TestarEmailRecorte />} />

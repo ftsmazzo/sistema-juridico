@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getPrazos, getLinkInscricaoCalendario, downloadPrazosIcs, type PrazoListItem } from "@/lib/api";
 
@@ -50,6 +51,7 @@ export function Prazos() {
   const [status, setStatus] = useState<string>("");
   const [tipo, setTipo] = useState<string>("");
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [totalPrazos, setTotalPrazos] = useState<number | null>(null);
   const [exportando, setExportando] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
@@ -116,6 +118,7 @@ export function Prazos() {
   const handleObterLink = async () => {
     const data = await getLinkInscricaoCalendario();
     setLinkUrl(data.url);
+    setTotalPrazos(data.totalPrazos ?? null);
   };
 
   const handleCopiarLink = () => {
@@ -161,6 +164,7 @@ export function Prazos() {
             Obter link de inscrição
           </button>
           {linkUrl && (
+          <>
             <div className="flex w-full flex-1 basis-full items-center gap-2 md:w-auto md:flex-1">
               <input
                 type="text"
@@ -176,13 +180,18 @@ export function Prazos() {
                 {copiado ? "Copiado!" : "Copiar"}
               </button>
             </div>
-          )}
-        </div>
-        {linkUrl && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            No Google Calendar: Outros calendários → Inscrever-se por URL. No Outlook: Adicionar
-            calendário → Assinar da Web. Cole o link acima.
-          </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              No Google Calendar: Outros calendários → Inscrever-se por URL. No Outlook: Adicionar
+              calendário → Assinar da Web. Cole o link acima.
+            </p>
+            {typeof totalPrazos === "number" && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {totalPrazos === 0
+                  ? "Você não tem prazos vinculados ao seu usuário (por OAB). O feed mostrará todos os prazos do sistema até haver vínculos."
+                  : `Seu link contém ${totalPrazos} prazo(s) no momento.`}
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -273,16 +282,17 @@ export function Prazos() {
                   <ul className="mt-1 space-y-0.5 overflow-hidden">
                     {prazosDoDia.slice(0, 3).map((p) => (
                       <li key={p.id}>
-                        <span
-                          className={`block truncate rounded px-1 py-0.5 text-xs ${
+                        <Link
+                          to={`/prazos/${p.id}`}
+                          className={`block truncate rounded px-1 py-0.5 text-xs hover:opacity-90 ${
                             p.status === 0
                               ? "bg-amber-500/20 text-amber-800 dark:text-amber-200"
                               : "bg-muted text-muted-foreground"
                           }`}
-                          title={`${p.prazo}${p.numeroProcesso ? ` — ${p.numeroProcesso}` : ""}`}
+                          title={`${p.prazo}${p.numeroProcesso ? ` — ${p.numeroProcesso}` : ""} (clique para detalhes)`}
                         >
                           {p.prazo}
-                        </span>
+                        </Link>
                       </li>
                     ))}
                     {prazosDoDia.length > 3 && (

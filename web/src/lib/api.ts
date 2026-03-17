@@ -132,6 +132,50 @@ export type PrazoListItem = {
   observacao: string | null;
 };
 
+export type PrazoSubtarefaItem = {
+  id: number;
+  titulo: string;
+  concluida: boolean;
+  ordem: number;
+};
+
+export type PrazoDetalhe = {
+  id: number;
+  prazo: string;
+  data: string;
+  tipo: string;
+  status: number;
+  numeroProcesso: string | null;
+  observacao: string | null;
+  conteudo: string | null;
+  resumoPublicacao: string | null;
+  movimentacaoTipo: string | null;
+  resumoMovimentacao: string | null;
+  publicacaoOabId: number | null;
+  processoId: number | null;
+  subtarefas: PrazoSubtarefaItem[];
+};
+
+export function getPrazoById(id: number) {
+  return api.get<PrazoDetalhe>(`/api/prazos/${id}`);
+}
+
+export function createSubtarefa(prazoId: number, titulo: string) {
+  return api.post<PrazoSubtarefaItem>(`/api/prazos/${prazoId}/subtarefas`, { titulo });
+}
+
+export function updateSubtarefa(
+  prazoId: number,
+  idItem: number,
+  data: { titulo?: string; concluida?: boolean }
+) {
+  return api.patch<PrazoSubtarefaItem>(`/api/prazos/${prazoId}/subtarefas/${idItem}`, data);
+}
+
+export function deleteSubtarefa(prazoId: number, idItem: number) {
+  return api.delete<{ ok: boolean }>(`/api/prazos/${prazoId}/subtarefas/${idItem}`);
+}
+
 /** Lista publicações OAB (mais recentes primeiro). limit opcional (default 50, máx 200). */
 export type PublicacaoListItem = {
   id: number;
