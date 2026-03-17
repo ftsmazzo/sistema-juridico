@@ -58,7 +58,7 @@ import {
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
 import { startEmailMonitorScheduler } from "./lib/email-monitor-scheduler.js";
-import { requireAuth } from "./middleware/auth.js";
+import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import { backfillPrazosUsuarios } from "./lib/processar-publicacao-oab.js";
 
 const app = express();
@@ -79,7 +79,7 @@ app.get("/api/prazos/feed.ics", getFeedIcs);
 app.get("/api/prazos/link-inscricao", requireAuth, getLinkInscricao);
 app.post("/api/prazos/backfill-usuarios", requireAuth, postBackfillUsuarios);
 app.get("/api/prazos", listPrazos);
-app.get("/api/prazos/:id", requireAuth, getPrazoById);
+app.get("/api/prazos/:id", optionalAuth, getPrazoById);
 app.post("/api/prazos/:id/subtarefas", requireAuth, createSubtarefa);
 app.post("/api/prazos/:id/sugerir-subtarefas", requireAuth, sugerirSubtarefas);
 app.patch("/api/prazos/:id/subtarefas/:idItem", requireAuth, updateSubtarefa);

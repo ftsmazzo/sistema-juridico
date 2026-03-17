@@ -3,7 +3,7 @@
  * Base URL: VITE_API_URL em dev, ou mesmo host em produção (proxy /api).
  */
 
-import { getToken } from "./auth";
+import { getToken, clearAuth } from "./auth";
 
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
@@ -29,6 +29,10 @@ export const api = {
       headers,
     });
     if (!res.ok) {
+      if (res.status === 401) {
+        clearAuth();
+        window.location.href = "/login";
+      }
       const text = await res.text();
       throw new Error(text || `HTTP ${res.status}`);
     }
