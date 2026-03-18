@@ -21,6 +21,21 @@ function formatarData(data: string | null) {
   });
 }
 
+/** Domínios que bloqueiam exibição em iframe (OneDrive, Google Drive, etc.). */
+function linkBloqueiaIframe(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host.includes("onedrive.live.com") ||
+      host.includes("sharepoint.com") ||
+      host.includes("drive.google.com") ||
+      host.includes("dropbox.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function DetalhePrazo() {
   const { id } = useParams<{ id: string }>();
   const prazoId = id ? parseInt(id, 10) : NaN;
@@ -261,47 +276,69 @@ export function DetalhePrazo() {
         )}
       </div>
 
-      {/* Modal visualizador de documento (iframe) */}
-      {mostrarVisualizador && prazo.linkPeca?.trim() && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Visualizar documento"
-        >
-          <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-2">
-            <span className="text-sm font-medium text-foreground">Documento (peça)</span>
-            <div className="flex gap-2">
-              <a
-                href={prazo.linkPeca!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
-              >
-                Abrir em nova aba
-              </a>
-              <button
-                type="button"
-                onClick={() => setMostrarVisualizador(false)}
-                className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
-              >
-                Fechar
-              </button>
+      {/* Modal visualizador de documento (iframe ou aviso para OneDrive/Drive) */}
+      {mostrarVisualizador && prazo.linkPeca?.trim() && (() => {
+        const url = prazo.linkPeca!;
+        const bloqueiaIframe = linkBloqueiaIframe(url);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Visualizar documento"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-2">
+              <span className="text-sm font-medium text-foreground">Documento (peça)</span>
+              <div className="flex gap-2">
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  Abrir em nova aba
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setMostrarVisualizador(false)}
+                  className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
+            <div className="min-h-0 flex-1 p-2">
+              {bloqueiaIframe ? (
+                <div className="flex h-full flex-col items-center justify-center gap-4 rounded border border-border bg-muted/30 p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Este link (OneDrive, Google Drive ou similar) não pode ser exibido dentro da página por segurança.
+                  </p>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    Abrir documento em nova aba
+                  </a>
+                </div>
+              ) : (
+                <iframe
+                  title="Documento da peça"
+                  src={url}
+                  className="h-full w-full rounded border border-border bg-white"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                />
+              )}
+            </div>
+            {!bloqueiaIframe && (
+              <p className="shrink-0 px-4 py-1 text-center text-xs text-muted-foreground">
+                Se o documento não carregar aqui, use &quot;Abrir em nova aba&quot;.
+              </p>
+            )}
           </div>
-          <div className="min-h-0 flex-1 p-2">
-            <iframe
-              title="Documento da peça"
-              src={prazo.linkPeca!}
-              className="h-full w-full rounded border border-border bg-white"
-              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            />
-          </div>
-          <p className="shrink-0 px-4 py-1 text-center text-xs text-muted-foreground">
-            Se o documento não carregar aqui (OneDrive pode bloquear incorporação), use &quot;Abrir em nova aba&quot;.
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Resumo / contexto (da publicação e movimentação) */}
       {temResumo && (
