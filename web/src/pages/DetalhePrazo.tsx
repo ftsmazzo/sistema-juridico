@@ -87,6 +87,7 @@ export function DetalhePrazo() {
       updatePrazo(prazoId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prazo", prazoId] });
+      queryClient.invalidateQueries({ queryKey: ["prazos"] });
       setLinkPecaInput("");
     },
   });

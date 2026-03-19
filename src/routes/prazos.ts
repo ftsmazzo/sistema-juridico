@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../db/index.js";
 import { prazos, publicacoesOab, movimentacoes, prazoSubtarefas } from "../db/schema.js";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import { sugerirSubtarefasParaPrazo } from "../lib/sugerir-subtarefas-ia.js";
 import type { RequestWithUser } from "../middleware/auth.js";
 
@@ -13,6 +13,8 @@ export type PrazoListItem = {
   status: number;
   numeroProcesso: string | null;
   observacao: string | null;
+  /** Data da publicação (DJE) quando o prazo vem de publicação OAB */
+  dataPublicacao: string | null;
 };
 
 /**
@@ -45,10 +47,12 @@ export async function listPrazos(
         status: prazos.status,
         numeroProcesso: prazos.numeroProcesso,
         observacao: prazos.observacao,
+        dataPublicacao: publicacoesOab.dataPublicacao,
       })
       .from(prazos)
+      .leftJoin(publicacoesOab, eq(prazos.publicacaoOabId, publicacoesOab.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(prazos.data, prazos.prazo);
+      .orderBy(asc(prazos.data), asc(prazos.prazo));
 
     res.json(
       list.map((p) => ({
@@ -59,6 +63,7 @@ export async function listPrazos(
         status: p.status,
         numeroProcesso: p.numeroProcesso,
         observacao: p.observacao,
+        dataPublicacao: p.dataPublicacao ?? null,
       }))
     );
   } catch (err) {

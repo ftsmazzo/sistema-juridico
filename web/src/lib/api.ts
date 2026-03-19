@@ -134,6 +134,8 @@ export type PrazoListItem = {
   status: number;
   numeroProcesso: string | null;
   observacao: string | null;
+  /** Data da publicação (DJE), quando houver vínculo com publicação OAB */
+  dataPublicacao: string | null;
 };
 
 export type PrazoSubtarefaItem = {

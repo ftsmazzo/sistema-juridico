@@ -16,6 +16,59 @@ const STATUS_OPCOES = [
   { value: "1", label: "Cumpridos" },
 ];
 
+/** Dias até o prazo (inclusive hoje) para exibir badge “Atenção / vencendo” */
+const ATENCAO_DIAS = 7;
+
+function addDaysISO(iso: string, dias: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + dias);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function formatarDataPrazo(iso: string) {
+  return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+type BadgePrazo = "cumprido" | "vencido" | "atencao" | "prazo";
+
+function badgeDoPrazo(p: PrazoListItem, hoje: string): BadgePrazo {
+  if (p.status !== 0) return "cumprido";
+  if (p.data < hoje) return "vencido";
+  const limiteAtencao = addDaysISO(hoje, ATENCAO_DIAS);
+  if (p.data <= limiteAtencao) return "atencao";
+  return "prazo";
+}
+
+function labelBadge(b: BadgePrazo): { texto: string; className: string } {
+  switch (b) {
+    case "cumprido":
+      return {
+        texto: "Cumprido",
+        className: "bg-muted text-muted-foreground",
+      };
+    case "vencido":
+      return {
+        texto: "Vencido / atrasado",
+        className: "bg-red-600/15 text-red-800 dark:text-red-300",
+      };
+    case "atencao":
+      return {
+        texto: "Atenção / vencendo",
+        className: "bg-amber-500/25 text-amber-900 dark:text-amber-200",
+      };
+    case "prazo":
+      return {
+        texto: "Dentro do prazo",
+        className: "bg-emerald-600/15 text-emerald-800 dark:text-emerald-200",
+      };
+  }
+}
+
 function getInicioFimMes(ano: number, mes: number) {
   const inicio = `${ano}-${String(mes).padStart(2, "0")}-01`;
   const ultimoDia = new Date(ano, mes, 0).getDate();
@@ -70,6 +123,24 @@ export function Prazos() {
         tipo: tipo || undefined,
       }),
   });
+
+  const { data: listaTodos = [], isPending: listaPending } = useQuery({
+    queryKey: ["prazos", "todos", status, tipo],
+    queryFn: () =>
+      getPrazos({
+        status: status === "" ? "" : Number(status),
+        tipo: tipo || undefined,
+      }),
+  });
+
+  const listaOrdenada = useMemo(() => {
+    const copy = [...listaTodos];
+    const pendentes = copy.filter((p) => p.status === 0);
+    const cumpridos = copy.filter((p) => p.status !== 0);
+    pendentes.sort((a, b) => a.data.localeCompare(b.data));
+    cumpridos.sort((a, b) => a.data.localeCompare(b.data));
+    return [...pendentes, ...cumpridos];
+  }, [listaTodos]);
 
   const prazosPorData = useMemo(() => {
     const map = new Map<string, PrazoListItem[]>();
@@ -136,7 +207,7 @@ export function Prazos() {
           Prazos
         </h2>
         <p className="text-muted-foreground">
-          Calendário e filtros para visualizar prazos processuais.
+          Calendário do mês selecionado e lista geral de prazos (respeitando os filtros abaixo).
         </p>
       </div>
 
@@ -309,19 +380,107 @@ export function Prazos() {
         )}
       </div>
 
+      {/* Lista completa (todos os prazos filtrados) */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Todos os prazos</h3>
+          <p className="text-sm text-muted-foreground">
+            Ordem: pendentes do mais urgente (vencido ou mais próximo) ao mais distante; em seguida,
+            cumpridos. Clique na linha para abrir o detalhe e baixar o prazo.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          {listaPending ? (
+            <div className="flex min-h-[120px] items-center justify-center p-8 text-muted-foreground">
+              Carregando lista…
+            </div>
+          ) : listaOrdenada.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              Nenhum prazo com os filtros atuais.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="px-3 py-3 font-semibold text-foreground">Situação</th>
+                    <th className="px-3 py-3 font-semibold text-foreground">Data do prazo</th>
+                    <th className="px-3 py-3 font-semibold text-foreground">Publicação</th>
+                    <th className="px-3 py-3 font-semibold text-foreground">Processo</th>
+                    <th className="px-3 py-3 font-semibold text-foreground">Prazo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listaOrdenada.map((p) => {
+                    const b = badgeDoPrazo(p, hoje);
+                    const { texto, className } = labelBadge(b);
+                    return (
+                      <tr
+                        key={p.id}
+                        className="border-b border-border/60 transition-colors hover:bg-muted/30"
+                      >
+                        <td className="px-3 py-2 align-middle">
+                          <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${className}`}>
+                            {texto}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 align-middle text-foreground">
+                          {formatarDataPrazo(p.data)}
+                        </td>
+                        <td className="max-w-[140px] truncate px-3 py-2 align-middle text-muted-foreground">
+                          {p.dataPublicacao?.trim() ? p.dataPublicacao : "—"}
+                        </td>
+                        <td className="max-w-[160px] truncate px-3 py-2 align-middle font-mono text-xs text-foreground">
+                          {p.numeroProcesso?.trim() ? p.numeroProcesso : "—"}
+                        </td>
+                        <td className="px-3 py-2 align-middle">
+                          <Link
+                            to={`/prazos/${p.id}`}
+                            className="font-medium text-primary hover:underline"
+                            title="Abrir detalhe"
+                          >
+                            {p.prazo}
+                          </Link>
+                          <span className="ml-2 text-xs text-muted-foreground">({p.tipo})</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Legenda */}
-      <div className="flex flex-wrap items-center gap-6 rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
-        <span className="font-medium text-muted-foreground">Legenda:</span>
-        <span className="flex items-center gap-2">
-          <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-800 dark:text-amber-200">
-            Pendente
+      <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-muted-foreground">Calendário:</span>
+          <span className="text-muted-foreground">
+            mostra apenas o mês exibido acima.
           </span>
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="rounded bg-muted px-2 py-0.5 text-muted-foreground">
-            Cumprido
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-medium text-muted-foreground">Badges (lista):</span>
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("vencido").className}`}>
+            {labelBadge("vencido").texto}
           </span>
-        </span>
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("atencao").className}`}>
+            {labelBadge("atencao").texto}
+          </span>
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("prazo").className}`}>
+            {labelBadge("prazo").texto}
+          </span>
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("cumprido").className}`}>
+            {labelBadge("cumprido").texto}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-6 text-xs text-muted-foreground">
+          <span>
+            Atenção: prazos pendentes com data entre hoje e os próximos {ATENCAO_DIAS} dias.
+          </span>
+        </div>
       </div>
     </div>
   );
