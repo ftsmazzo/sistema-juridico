@@ -126,7 +126,9 @@ export async function runEmailCheck(
         if (result.publicacaoId) {
           publicacoesCriadas++;
           if (result.prazoIds?.length) prazosCriados += result.prazoIds.length;
-          if (!result.skipped && process.env.WEBHOOK_N8N_ANALISE_PUBLICACAO_URL?.trim()) {
+          // Consome token apenas quando a publicação é nova (evita chamar IA em "enriquecimento"
+          // de publicações já existentes em execuções agendadas).
+          if (result.criadaAgora && process.env.WEBHOOK_N8N_ANALISE_PUBLICACAO_URL?.trim()) {
             const analiseResult = await executarAnaliseN8nParaPublicacao(result.publicacaoId);
             if (analiseResult.analiseGravada) {
               prazosCriados += analiseResult.prazosCriados;
