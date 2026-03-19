@@ -45,26 +45,28 @@ function badgeDoPrazo(p: PrazoListItem, hoje: string): BadgePrazo {
 }
 
 function labelBadge(b: BadgePrazo): { texto: string; className: string } {
+  /* Fundos mantidos; texto preto para melhor visibilidade (pedido do cliente). */
+  const textoPreto = "font-semibold text-black";
   switch (b) {
     case "cumprido":
       return {
         texto: "Cumprido",
-        className: "bg-muted text-muted-foreground",
+        className: `bg-muted ${textoPreto}`,
       };
     case "vencido":
       return {
         texto: "Vencido / atrasado",
-        className: "bg-red-600/15 text-red-800 dark:text-red-300",
+        className: `bg-red-600/15 ${textoPreto}`,
       };
     case "atencao":
       return {
         texto: "Atenção / vencendo",
-        className: "bg-amber-500/25 text-amber-900 dark:text-amber-200",
+        className: `bg-amber-500/25 ${textoPreto}`,
       };
     case "prazo":
       return {
         texto: "Dentro do prazo",
-        className: "bg-emerald-600/15 text-emerald-800 dark:text-emerald-200",
+        className: `bg-emerald-600/15 ${textoPreto}`,
       };
   }
 }
@@ -356,10 +358,8 @@ export function Prazos() {
                       <li key={p.id}>
                         <Link
                           to={`/prazos/${p.id}`}
-                          className={`block truncate rounded px-1 py-0.5 text-xs hover:opacity-90 ${
-                            p.status === 0
-                              ? "bg-amber-500/20 text-amber-800 dark:text-amber-200"
-                              : "bg-muted text-muted-foreground"
+                          className={`block truncate rounded px-1 py-0.5 text-xs font-semibold text-black hover:opacity-90 ${
+                            p.status === 0 ? "bg-amber-500/20" : "bg-muted"
                           }`}
                           title={`${p.prazo}${p.numeroProcesso ? ` — ${p.numeroProcesso}` : ""} (clique para detalhes)`}
                         >
@@ -420,7 +420,7 @@ export function Prazos() {
                         className="border-b border-border/60 transition-colors hover:bg-muted/30"
                       >
                         <td className="px-3 py-2 align-middle">
-                          <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${className}`}>
+                          <span className={`inline-block rounded px-2 py-0.5 text-xs ${className}`}>
                             {texto}
                           </span>
                         </td>
@@ -463,16 +463,16 @@ export function Prazos() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-medium text-muted-foreground">Badges (lista):</span>
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("vencido").className}`}>
+          <span className={`rounded px-2 py-0.5 text-xs ${labelBadge("vencido").className}`}>
             {labelBadge("vencido").texto}
           </span>
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("atencao").className}`}>
+          <span className={`rounded px-2 py-0.5 text-xs ${labelBadge("atencao").className}`}>
             {labelBadge("atencao").texto}
           </span>
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("prazo").className}`}>
+          <span className={`rounded px-2 py-0.5 text-xs ${labelBadge("prazo").className}`}>
             {labelBadge("prazo").texto}
           </span>
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${labelBadge("cumprido").className}`}>
+          <span className={`rounded px-2 py-0.5 text-xs ${labelBadge("cumprido").className}`}>
             {labelBadge("cumprido").texto}
           </span>
         </div>
