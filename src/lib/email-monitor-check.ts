@@ -124,7 +124,7 @@ export async function runEmailCheck(
         }
         const result = await processarItemPublicacaoOab(item);
         if (result.publicacaoId) {
-          publicacoesCriadas++;
+          if (result.criadaAgora) publicacoesCriadas++;
           if (result.prazoIds?.length) prazosCriados += result.prazoIds.length;
           // Consome token apenas quando a publicação é nova (evita chamar IA em "enriquecimento"
           // de publicações já existentes em execuções agendadas).
