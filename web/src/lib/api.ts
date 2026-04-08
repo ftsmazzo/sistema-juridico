@@ -114,11 +114,26 @@ export type AgrupamentoSemMovimentacao = {
   dias120Mais: SemMovimentacaoBucket;
 };
 
+export type DashboardTarefaInterna = {
+  id: number;
+  prazoId: number;
+  titulo: string;
+  dataLimite: string;
+  tipo: string;
+  prazoTitulo: string;
+  numeroProcesso: string | null;
+  nomeCriador: string;
+  nomeResponsavel: string;
+  podeCobrar: boolean;
+};
+
 export type DashboardResponse = {
   totais: DashboardTotais;
   proximosPrazos: ProximoPrazo[];
   sugestoesIa: SugestaoIa[];
   agrupamentoSemMovimentacao: AgrupamentoSemMovimentacao;
+  tarefasParaExecutar: DashboardTarefaInterna[];
+  tarefasDelegadas: DashboardTarefaInterna[];
 };
 
 /** Dados do dashboard (totais, próximos prazos, sugestões da IA) */

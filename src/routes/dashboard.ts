@@ -1,12 +1,16 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { db } from "../db/index.js";
 import {
   publicacoesOab,
   prazos,
   processos,
   analiseIaPublicacao,
+  tarefaInterna,
+  usuarios,
 } from "../db/schema.js";
-import { count, eq, gte, desc, and, isNotNull, inArray, lte, gt, isNull, sql } from "drizzle-orm";
+import { count, eq, gte, desc, and, isNotNull, inArray, lte, gt, isNull, sql, asc } from "drizzle-orm";
+import type { RequestWithUser } from "../middleware/auth.js";
+import { hojeIsoSaoPaulo, dataIsoMenorOuIgual } from "../lib/tarefas-internas-datas.js";
 
 export type DashboardTotais = {
   publicacoes: number;
@@ -46,19 +50,138 @@ export type AgrupamentoSemMovimentacao = {
   dias120Mais: SemMovimentacaoBucket;
 };
 
+/** Tarefas internas pendentes para o usuário logado (dashboard). */
+export type DashboardTarefaInterna = {
+  id: number;
+  prazoId: number;
+  titulo: string;
+  dataLimite: string;
+  tipo: string;
+  prazoTitulo: string;
+  numeroProcesso: string | null;
+  nomeCriador: string;
+  nomeResponsavel: string;
+  /** Só faz sentido quando o usuário é o criador (delegou). */
+  podeCobrar: boolean;
+};
+
 export type DashboardResponse = {
   totais: DashboardTotais;
   proximosPrazos: ProximoPrazo[];
   sugestoesIa: SugestaoIa[];
   agrupamentoSemMovimentacao: AgrupamentoSemMovimentacao;
+  /** Preenchido quando há usuário autenticado. */
+  tarefasParaExecutar: DashboardTarefaInterna[];
+  tarefasDelegadas: DashboardTarefaInterna[];
 };
+
+function montarNome(u: { nome: string; sobrenome: string }): string {
+  return `${u.nome} ${u.sobrenome}`.trim();
+}
+
+async function carregarTarefasInternasDashboard(
+  userId: number
+): Promise<{ paraExecutar: DashboardTarefaInterna[]; delegadas: DashboardTarefaInterna[] }> {
+  const hoje = hojeIsoSaoPaulo();
+
+  const comoExecutor = await db
+    .select({
+      id: tarefaInterna.id,
+      prazoId: tarefaInterna.prazoId,
+      titulo: tarefaInterna.titulo,
+      dataLimite: tarefaInterna.dataLimite,
+      tipo: tarefaInterna.tipo,
+      idCriador: tarefaInterna.idCriador,
+      idResponsavel: tarefaInterna.idResponsavel,
+      prazoTitulo: prazos.prazo,
+      numeroProcesso: prazos.numeroProcesso,
+    })
+    .from(tarefaInterna)
+    .innerJoin(prazos, eq(tarefaInterna.prazoId, prazos.id))
+    .where(and(eq(tarefaInterna.status, "pendente"), eq(tarefaInterna.idResponsavel, userId)))
+    .orderBy(asc(tarefaInterna.dataLimite), asc(tarefaInterna.id))
+    .limit(12);
+
+  const comoCriador = await db
+    .select({
+      id: tarefaInterna.id,
+      prazoId: tarefaInterna.prazoId,
+      titulo: tarefaInterna.titulo,
+      dataLimite: tarefaInterna.dataLimite,
+      tipo: tarefaInterna.tipo,
+      idCriador: tarefaInterna.idCriador,
+      idResponsavel: tarefaInterna.idResponsavel,
+      d3EnviadoEm: tarefaInterna.d3EnviadoEm,
+      prazoTitulo: prazos.prazo,
+      numeroProcesso: prazos.numeroProcesso,
+    })
+    .from(tarefaInterna)
+    .innerJoin(prazos, eq(tarefaInterna.prazoId, prazos.id))
+    .where(and(eq(tarefaInterna.status, "pendente"), eq(tarefaInterna.idCriador, userId)))
+    .orderBy(asc(tarefaInterna.dataLimite), asc(tarefaInterna.id))
+    .limit(12);
+
+  const ids = new Set<number>();
+  for (const r of comoExecutor) {
+    ids.add(r.idCriador);
+    ids.add(r.idResponsavel);
+  }
+  for (const r of comoCriador) {
+    ids.add(r.idCriador);
+    ids.add(r.idResponsavel);
+  }
+  const idList = [...ids].filter((id) => id > 0);
+  const nomesRows =
+    idList.length > 0
+      ? await db
+          .select({ id: usuarios.id, nome: usuarios.nome, sobrenome: usuarios.sobrenome })
+          .from(usuarios)
+          .where(inArray(usuarios.id, idList))
+      : [];
+  const nomePorId = new Map(nomesRows.map((u) => [u.id, montarNome(u)]));
+
+  const paraExecutar: DashboardTarefaInterna[] = comoExecutor.map((r) => ({
+    id: r.id,
+    prazoId: r.prazoId,
+    titulo: r.titulo,
+    dataLimite: String(r.dataLimite),
+    tipo: r.tipo,
+    prazoTitulo: r.prazoTitulo,
+    numeroProcesso: r.numeroProcesso,
+    nomeCriador: nomePorId.get(r.idCriador) ?? `#${r.idCriador}`,
+    nomeResponsavel: nomePorId.get(r.idResponsavel) ?? `#${r.idResponsavel}`,
+    podeCobrar: false,
+  }));
+
+  const delegadas: DashboardTarefaInterna[] = comoCriador.map((r) => {
+    const podeCobrar =
+      r.d3EnviadoEm != null &&
+      r.idCriador !== r.idResponsavel &&
+      dataIsoMenorOuIgual(hoje, String(r.dataLimite));
+    return {
+      id: r.id,
+      prazoId: r.prazoId,
+      titulo: r.titulo,
+      dataLimite: String(r.dataLimite),
+      tipo: r.tipo,
+      prazoTitulo: r.prazoTitulo,
+      numeroProcesso: r.numeroProcesso,
+      nomeCriador: nomePorId.get(r.idCriador) ?? `#${r.idCriador}`,
+      nomeResponsavel: nomePorId.get(r.idResponsavel) ?? `#${r.idResponsavel}`,
+      podeCobrar,
+    };
+  });
+
+  return { paraExecutar, delegadas };
+}
 
 /**
  * GET /api/dashboard
  * Retorna totais, próximos prazos (pendentes) e sugestões/observações da IA.
+ * Com token: inclui tarefas internas onde o usuário é responsável ou criador.
  */
 export async function getDashboard(
-  _req: Request,
+  req: RequestWithUser,
   res: Response<DashboardResponse | { error: string }>
 ): Promise<void> {
   try {
@@ -255,6 +378,14 @@ export async function getDashboard(
       createdAt: s.createdAt.toISOString(),
     }));
 
+    let tarefasParaExecutar: DashboardTarefaInterna[] = [];
+    let tarefasDelegadas: DashboardTarefaInterna[] = [];
+    if (req.user?.id) {
+      const t = await carregarTarefasInternasDashboard(req.user.id);
+      tarefasParaExecutar = t.paraExecutar;
+      tarefasDelegadas = t.delegadas;
+    }
+
     res.json({
       totais,
       proximosPrazos: proximos.map((p) => ({
@@ -267,6 +398,8 @@ export async function getDashboard(
       })),
       sugestoesIa,
       agrupamentoSemMovimentacao,
+      tarefasParaExecutar,
+      tarefasDelegadas,
     });
   } catch (err) {
     console.error("Dashboard error:", err);

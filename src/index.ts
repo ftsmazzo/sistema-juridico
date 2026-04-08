@@ -86,7 +86,7 @@ app.get("/health", (_req, res) => {
 
 app.post("/api/auth/login", login);
 
-app.get("/api/dashboard", getDashboard);
+app.get("/api/dashboard", optionalAuth, getDashboard);
 app.get("/api/prazos/export.ics", requireAuth, getExportIcs);
 app.get("/api/prazos/feed.ics", getFeedIcs);
 app.get("/api/prazos/link-inscricao", requireAuth, getLinkInscricao);

@@ -1,7 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { getDashboard } from "@/lib/api";
+import {
+  getDashboard,
+  cumprirTarefaInterna,
+  cobrarTarefaInterna,
+  TAREFA_INTERNA_TIPOS_OPT,
+  type DashboardTarefaInterna,
+} from "@/lib/api";
 import { getUser } from "@/lib/auth";
+
+function labelTipoTarefa(tipo: string) {
+  return TAREFA_INTERNA_TIPOS_OPT.find((o) => o.value === tipo)?.label ?? tipo;
+}
 
 function formatarData(iso: string) {
   const d = new Date(iso + "T12:00:00");
@@ -13,9 +23,26 @@ function formatarData(iso: string) {
 }
 
 export function Dashboard() {
+  const queryClient = useQueryClient();
   const { data, isPending, isError } = useQuery({
     queryKey: ["dashboard"],
     queryFn: getDashboard,
+  });
+
+  const cumprirMutation = useMutation({
+    mutationFn: (id: number) => cumprirTarefaInterna(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["tarefas-internas"] });
+    },
+  });
+
+  const cobrarMutation = useMutation({
+    mutationFn: (id: number) => cobrarTarefaInterna(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["tarefas-internas"] });
+    },
   });
 
   if (isError) {
@@ -45,6 +72,9 @@ export function Dashboard() {
     dias90: { totalProcessos: 0, totalPrazos: 0 },
     dias120Mais: { totalProcessos: 0, totalPrazos: 0 },
   };
+  const tarefasExecutar: DashboardTarefaInterna[] = data?.tarefasParaExecutar ?? [];
+  const tarefasDelegadas: DashboardTarefaInterna[] = data?.tarefasDelegadas ?? [];
+
   const linhasSemMov = [
     { key: "sem-info" as const, label: "Sem informação de movimentação", ...agrupamento.semInformacao },
     { key: "30" as const, label: "30 a 59 dias sem movimentação", ...agrupamento.dias30 },
@@ -109,6 +139,113 @@ export function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Tarefas internas (por login: executar vs delegadas) */}
+      {user && (
+        <section className="rounded-xl border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h3 className="font-semibold text-foreground">Tarefas internas</h3>
+            <p className="text-sm text-muted-foreground">
+              Providências ligadas a prazos: o que você deve executar e o que você delegou a outra pessoa.
+            </p>
+          </div>
+          <div className="grid gap-6 p-4 lg:grid-cols-2">
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-foreground">Para você executar</h4>
+              {isPending ? (
+                <p className="text-sm text-muted-foreground">Carregando…</p>
+              ) : tarefasExecutar.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nada pendente como responsável.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {tarefasExecutar.map((t) => (
+                    <li
+                      key={t.id}
+                      className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm"
+                    >
+                      <p className="font-medium text-foreground">{t.titulo}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {labelTipoTarefa(t.tipo)} · limite {formatarData(t.dataLimite)}
+                        {t.numeroProcesso && ` · ${t.numeroProcesso}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Prazo: {t.prazoTitulo} · Delegada por {t.nomeCriador}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Link
+                          to={`/prazos/${t.prazoId}`}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          Abrir prazo
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => cumprirMutation.mutate(t.id)}
+                          disabled={cumprirMutation.isPending}
+                          className="rounded border border-border bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                        >
+                          Cumprir
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-foreground">Que você delegou</h4>
+              {isPending ? (
+                <p className="text-sm text-muted-foreground">Carregando…</p>
+              ) : tarefasDelegadas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente criada por você.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {tarefasDelegadas.map((t) => (
+                    <li
+                      key={t.id}
+                      className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm"
+                    >
+                      <p className="font-medium text-foreground">{t.titulo}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {labelTipoTarefa(t.tipo)} · limite {formatarData(t.dataLimite)}
+                        {t.numeroProcesso && ` · ${t.numeroProcesso}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Prazo: {t.prazoTitulo} · Responsável: {t.nomeResponsavel}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Link
+                          to={`/prazos/${t.prazoId}`}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          Abrir prazo
+                        </Link>
+                        {t.podeCobrar && (
+                          <button
+                            type="button"
+                            onClick={() => cobrarMutation.mutate(t.id)}
+                            disabled={cobrarMutation.isPending}
+                            className="rounded border border-amber-600/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200 disabled:opacity-50"
+                          >
+                            Cobrança
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          {!isPending && (
+            <div className="border-t border-border px-4 py-3 text-center">
+              <Link to="/tarefas-internas" className="text-sm font-medium text-primary hover:underline">
+                Ver todas as tarefas internas →
+              </Link>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Próximos prazos + Sugestões IA — duas colunas em desktop */}
       <div className="grid gap-8 lg:grid-cols-2">
