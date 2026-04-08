@@ -10,6 +10,7 @@ import { podeVerUsuarios, isGestor } from "@/lib/auth";
 const baseNav = [
   { to: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
   { to: "/prazos", label: "Prazos", Icon: CalendarIcon },
+  { to: "/tarefas-internas", label: "Tarefas internas", Icon: DocumentIcon },
   { to: "/publicacoes", label: "Publicações", Icon: DocumentIcon },
   { to: "/monitoramento-email", label: "Monitoramento de e-mail", Icon: MailIcon },
   { to: "/processos", label: "Processos", Icon: DocumentIcon },

@@ -31,6 +31,27 @@ export function isFeriado(d: Date): boolean {
   return FERIADOS.has(toKey(d));
 }
 
+/** Feriado nacional pela data civil YYYY-MM-DD (calendário Brasil). */
+export function isFeriadoIso(isoYmd: string): boolean {
+  return FERIADOS.has(isoYmd);
+}
+
+/**
+ * Dia útil em calendário BR: seg–sex, não feriado nacional.
+ * `isoYmd` = YYYY-MM-DD (data civil, independente do fuso do servidor).
+ */
+export function isDiaUtilIsoBr(isoYmd: string): boolean {
+  const [y, m, d] = isoYmd.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const instant = new Date(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T15:00:00-03:00`);
+  const short = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "short",
+  }).format(instant);
+  if (short === "Sat" || short === "Sun") return false;
+  return !isFeriadoIso(isoYmd);
+}
+
 /** Retorna true se for dia útil (não é sábado, domingo nem feriado). */
 export function isDiaUtil(d: Date): boolean {
   const dia = d.getDay();

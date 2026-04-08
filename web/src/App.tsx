@@ -14,6 +14,7 @@ import { DetalheProcesso } from "@/pages/DetalheProcesso";
 import { Pessoas } from "@/pages/Pessoas";
 import { Usuarios } from "@/pages/Usuarios";
 import { Administracao } from "@/pages/Administracao";
+import { TarefasInternas } from "@/pages/TarefasInternas";
 import { Login } from "@/pages/Login";
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="prazos" element={<Prazos />} />
           <Route path="prazos/:id" element={<DetalhePrazo />} />
+          <Route path="tarefas-internas" element={<TarefasInternas />} />
           <Route path="publicacoes" element={<Publicacoes />} />
           <Route path="publicacoes/nova" element={<NovaPublicacao />} />
           <Route path="publicacoes/testar-email" element={<TestarEmailRecorte />} />

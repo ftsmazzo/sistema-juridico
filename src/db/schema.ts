@@ -9,6 +9,7 @@ import {
   integer,
   uniqueIndex,
   jsonb,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -100,6 +101,54 @@ export const prazoSubtarefas = pgTable("prazo_subtarefas", {
   ordem: integer("ordem").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/** Labels globais para tarefas internas (único por nome canônico no banco via índice SQL). */
+export const tarefaLabel = pgTable("tarefa_label", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 120 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Tarefas operacionais do escritório, sempre ligadas a um prazo. */
+export const tarefaInterna = pgTable("tarefa_interna", {
+  id: serial("id").primaryKey(),
+  prazoId: integer("prazo_id")
+    .notNull()
+    .references(() => prazos.id, { onDelete: "cascade" }),
+  titulo: varchar("titulo", { length: 500 }).notNull(),
+  descricao: text("descricao"),
+  tipo: varchar("tipo", { length: 40 }).notNull(),
+  dataLimite: date("data_limite").notNull(),
+  idCriador: integer("id_criador")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "restrict" }),
+  idResponsavel: integer("id_responsavel")
+    .notNull()
+    .references(() => usuarios.id, { onDelete: "restrict" }),
+  status: varchar("status", { length: 20 }).notNull().default("pendente"),
+  cumpridaEm: timestamp("cumprida_em"),
+  cumpridoPor: integer("cumprido_por").references(() => usuarios.id, { onDelete: "set null" }),
+  d3EnviadoEm: timestamp("d3_enviado_em"),
+  cobrancaUltimaEm: timestamp("cobranca_ultima_em"),
+  criacaoNotificadaEm: timestamp("criacao_notificada_em"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const tarefaInternaLabel = pgTable(
+  "tarefa_interna_label",
+  {
+    tarefaInternaId: integer("tarefa_interna_id")
+      .notNull()
+      .references(() => tarefaInterna.id, { onDelete: "cascade" }),
+    tarefaLabelId: integer("tarefa_label_id")
+      .notNull()
+      .references(() => tarefaLabel.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.tarefaInternaId, t.tarefaLabelId] }),
+  })
+);
 
 // --- Audiências ---
 export const audiencias = pgTable("audiencias", {
@@ -429,6 +478,7 @@ export const prazosRelations = relations(prazos, ({ one, many }) => ({
   }),
   prazosUsuarios: many(prazosUsuarios),
   subtarefas: many(prazoSubtarefas),
+  tarefasInternas: many(tarefaInterna),
 }));
 
 export const prazoSubtarefasRelations = relations(prazoSubtarefas, ({ one }) => ({
@@ -436,6 +486,39 @@ export const prazoSubtarefasRelations = relations(prazoSubtarefas, ({ one }) => 
     fields: [prazoSubtarefas.idPrazo],
     references: [prazos.id],
   }),
+}));
+
+export const tarefaInternaRelations = relations(tarefaInterna, ({ one, many }) => ({
+  prazo: one(prazos, {
+    fields: [tarefaInterna.prazoId],
+    references: [prazos.id],
+  }),
+  criador: one(usuarios, {
+    fields: [tarefaInterna.idCriador],
+    references: [usuarios.id],
+    relationName: "tarefaInternaCriador",
+  }),
+  responsavel: one(usuarios, {
+    fields: [tarefaInterna.idResponsavel],
+    references: [usuarios.id],
+    relationName: "tarefaInternaResponsavel",
+  }),
+  labels: many(tarefaInternaLabel),
+}));
+
+export const tarefaInternaLabelRelations = relations(tarefaInternaLabel, ({ one }) => ({
+  tarefa: one(tarefaInterna, {
+    fields: [tarefaInternaLabel.tarefaInternaId],
+    references: [tarefaInterna.id],
+  }),
+  label: one(tarefaLabel, {
+    fields: [tarefaInternaLabel.tarefaLabelId],
+    references: [tarefaLabel.id],
+  }),
+}));
+
+export const tarefaLabelRelations = relations(tarefaLabel, ({ many }) => ({
+  tarefas: many(tarefaInternaLabel),
 }));
 
 export const movimentacoesRelations = relations(movimentacoes, ({ one, many }) => ({

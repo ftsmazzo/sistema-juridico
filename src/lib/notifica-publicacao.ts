@@ -31,7 +31,7 @@ function formatarDataBr(val: string | Date | null | undefined): string {
 /**
  * Formata celular do sistema (16)99999-9999 para 5516999999999 (Evolution/WhatsApp).
  */
-function formatarNumeroParaEvolution(celular: string | null | undefined): string | null {
+export function formatarNumeroParaEvolution(celular: string | null | undefined): string | null {
   if (celular == null || !String(celular).trim()) return null;
   const digits = String(celular).replace(/\D/g, "");
   if (digits.length === 0) return null;
@@ -101,7 +101,7 @@ async function buscarTelefonePorOab(numeroOab: string | null | undefined): Promi
  * Busca telefone (celular) do usuário pelo ID (usuarios + pessoas).
  * Retorna número formatado 5516999999999 ou null.
  */
-async function buscarTelefonePorUsuarioId(idUsuario: number): Promise<string | null> {
+export async function buscarTelefonePorUsuarioId(idUsuario: number): Promise<string | null> {
   const [u] = await db
     .select({ celular: usuarios.celular, idPessoa: usuarios.idPessoa })
     .from(usuarios)

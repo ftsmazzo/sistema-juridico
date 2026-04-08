@@ -740,6 +740,112 @@ export function sincronizarDadosEscavador(body: { oab_uf: string; oab_numero: st
   );
 }
 
+// --- Tarefas internas ---
+export type TarefaLabelItem = { id: number; nome: string };
+
+export type TarefaInternaItem = {
+  id: number;
+  prazoId: number;
+  titulo: string;
+  descricao: string | null;
+  tipo: string;
+  dataLimite: string;
+  idCriador: number;
+  idResponsavel: number;
+  nomeCriador: string;
+  nomeResponsavel: string;
+  status: string;
+  cumpridaEm: string | null;
+  numeroProcesso: string | null;
+  labels: TarefaLabelItem[];
+  d3EnviadoEm: string | null;
+  podeCobrar: boolean;
+};
+
+export const TAREFA_INTERNA_TIPOS_OPT = [
+  { value: "reuniao_cliente", label: "Reunião com cliente" },
+  { value: "atualizacao_calculo", label: "Atualização de cálculo/planilha" },
+  { value: "audiencia_avisar_cliente", label: "Audiência — avisar cliente" },
+  { value: "email_cliente", label: "E-mail ao cliente" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+export function getTarefaLabels() {
+  return api.get<TarefaLabelItem[]>("/api/tarefa-labels");
+}
+
+export function createTarefaLabel(nome: string) {
+  return api.post<TarefaLabelItem>("/api/tarefa-labels", { nome });
+}
+
+export function deleteTarefaLabel(id: number) {
+  return api.delete<{ ok: boolean }>(`/api/tarefa-labels/${id}`);
+}
+
+export function getTarefasInternas(params?: {
+  status?: string;
+  atrasadas?: boolean;
+  idResponsavel?: number;
+  idCriador?: number;
+  prazoId?: number;
+  tipo?: string;
+  dataLimiteInicio?: string;
+  dataLimiteFim?: string;
+  labelIds?: number[];
+}) {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.atrasadas) sp.set("atrasadas", "1");
+  if (params?.idResponsavel != null) sp.set("idResponsavel", String(params.idResponsavel));
+  if (params?.idCriador != null) sp.set("idCriador", String(params.idCriador));
+  if (params?.prazoId != null) sp.set("prazoId", String(params.prazoId));
+  if (params?.tipo) sp.set("tipo", params.tipo);
+  if (params?.dataLimiteInicio) sp.set("dataLimiteInicio", params.dataLimiteInicio);
+  if (params?.dataLimiteFim) sp.set("dataLimiteFim", params.dataLimiteFim);
+  if (params?.labelIds?.length) sp.set("labelIds", params.labelIds.join(","));
+  const q = sp.toString();
+  return api.get<TarefaInternaItem[]>(`/api/tarefas-internas${q ? `?${q}` : ""}`);
+}
+
+export function getTarefaInterna(id: number) {
+  return api.get<TarefaInternaItem>(`/api/tarefas-internas/${id}`);
+}
+
+export function createTarefaInterna(body: {
+  prazoId: number;
+  titulo: string;
+  descricao?: string | null;
+  tipo: string;
+  dataLimite: string;
+  idResponsavel: number;
+  labelIds?: number[];
+}) {
+  return api.post<TarefaInternaItem>("/api/tarefas-internas", body);
+}
+
+export function updateTarefaInterna(
+  id: number,
+  body: {
+    titulo?: string;
+    descricao?: string | null;
+    tipo?: string;
+    dataLimite?: string;
+    idResponsavel?: number;
+    labelIds?: number[];
+    status?: "cancelada";
+  }
+) {
+  return api.patch<TarefaInternaItem>(`/api/tarefas-internas/${id}`, body);
+}
+
+export function cumprirTarefaInterna(id: number) {
+  return api.post<TarefaInternaItem>(`/api/tarefas-internas/${id}/cumprir`);
+}
+
+export function cobrarTarefaInterna(id: number) {
+  return api.post<TarefaInternaItem>(`/api/tarefas-internas/${id}/cobranca`);
+}
+
 // --- Admin (apenas Gestor) ---
 export function limparDados() {
   return api.post<{ ok: boolean; message: string }>("/api/admin/limpar-dados");

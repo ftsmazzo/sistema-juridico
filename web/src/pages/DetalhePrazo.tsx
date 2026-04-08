@@ -11,6 +11,7 @@ import {
   type PrazoSubtarefaItem,
 } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import { TarefasInternasPrazo } from "@/components/TarefasInternasPrazo";
 
 function formatarData(data: string | null) {
   if (!data) return "—";
@@ -497,6 +498,8 @@ export function DetalhePrazo() {
           </button>
         </form>
       </div>
+
+      <TarefasInternasPrazo prazoId={prazoId} />
     </div>
   );
 }

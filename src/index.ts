@@ -59,8 +59,20 @@ import {
 import { runMigrations } from "./db/run-migrate.js";
 import { runSeedGestores } from "./db/seed-gestores.js";
 import { startEmailMonitorScheduler } from "./lib/email-monitor-scheduler.js";
+import { startTarefasInternasScheduler } from "./lib/tarefas-internas-scheduler.js";
 import { requireAuth, optionalAuth } from "./middleware/auth.js";
 import { backfillPrazosUsuarios } from "./lib/processar-publicacao-oab.js";
+import {
+  listTarefasInternas,
+  getTarefaInterna,
+  postTarefaInterna,
+  patchTarefaInterna,
+  postTarefaInternaCumprir,
+  postTarefaInternaCobranca,
+  listTarefaLabels,
+  postTarefaLabel,
+  deleteTarefaLabel,
+} from "./routes/tarefas-internas.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -131,6 +143,16 @@ app.put("/api/email-monitor/contas/:id", requireAuth, putConta);
 app.delete("/api/email-monitor/contas/:id", requireAuth, deleteConta);
 app.post("/api/email-monitor/verificar-agora", requireAuth, postVerificarAgora);
 
+app.get("/api/tarefas-internas", requireAuth, listTarefasInternas);
+app.get("/api/tarefas-internas/:id", requireAuth, getTarefaInterna);
+app.post("/api/tarefas-internas", requireAuth, postTarefaInterna);
+app.patch("/api/tarefas-internas/:id", requireAuth, patchTarefaInterna);
+app.post("/api/tarefas-internas/:id/cumprir", requireAuth, postTarefaInternaCumprir);
+app.post("/api/tarefas-internas/:id/cobranca", requireAuth, postTarefaInternaCobranca);
+app.get("/api/tarefa-labels", requireAuth, listTarefaLabels);
+app.post("/api/tarefa-labels", requireAuth, postTarefaLabel);
+app.delete("/api/tarefa-labels/:id", requireAuth, deleteTarefaLabel);
+
 app.post("/api/webhooks/publicacoes-oab", handlePublicacoesOab);
 
 async function start() {
@@ -143,6 +165,7 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`API rodando em http://localhost:${PORT}`);
     startEmailMonitorScheduler();
+    startTarefasInternasScheduler();
     backfillPrazosUsuarios()
       .then((r) => {
         if (r.vinculosInseridos > 0) console.log(`Backfill calendário: ${r.vinculosInseridos} vínculos para ${r.prazosProcessados} prazos`);
