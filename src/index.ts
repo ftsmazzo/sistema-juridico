@@ -17,6 +17,7 @@ import {
   listPublicacoes,
   getPublicacaoById,
   updatePublicacao,
+  recriarPrazosPublicacao,
 } from "./routes/publicacoes.js";
 import { dispararAnaliseN8n } from "./routes/publicacoes-disparar-n8n.js";
 import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
@@ -101,6 +102,7 @@ app.delete("/api/prazos/:id/subtarefas/:idItem", requireAuth, deleteSubtarefa);
 app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);
+app.post("/api/publicacoes/:id/recriar-prazos", requireAuth, recriarPrazosPublicacao);
 app.post("/api/publicacoes/:id/disparar-analise-n8n", requireAuth, dispararAnaliseN8n);
 app.post("/api/publicacoes/por-print", requireAuth, publicacaoPorPrint);
 

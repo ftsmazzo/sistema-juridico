@@ -377,3 +377,34 @@ export async function updatePublicacao(
     res.status(500).json({ error: "Erro ao atualizar publicação" });
   }
 }
+
+/**
+ * POST /api/publicacoes/:id/recriar-prazos
+ * Recalcula prazos a partir dos dados de IA já gravados (regra 5 du fatal / 3 du no calendário quando sem prazo específico).
+ */
+export async function recriarPrazosPublicacao(
+  req: Request,
+  res: Response<{ ok: boolean; prazoIds: number[] } | { error: string }>
+): Promise<void> {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    const [row] = await db
+      .select({ id: publicacoesOab.id })
+      .from(publicacoesOab)
+      .where(eq(publicacoesOab.id, id))
+      .limit(1);
+    if (!row) {
+      res.status(404).json({ error: "Publicação não encontrada" });
+      return;
+    }
+    const { prazoIds } = await criarPrazosAPartirDePublicacao(id);
+    res.json({ ok: true, prazoIds });
+  } catch (err) {
+    console.error("Recriar prazos publicacao error:", err);
+    res.status(500).json({ error: "Erro ao recriar prazos da publicação" });
+  }
+}

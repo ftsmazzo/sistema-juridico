@@ -33,7 +33,7 @@ Cada objeto do array deve ter exatamente estas chaves:
 - local (string)
 - resumo (string: duas a quatro frases objetivas para o advogado: (a) qual ato; (b) o que a parte deve fazer; (c) prazo. Linguagem clara.)
 - baseLegal (string: artigo/lei citado. Vazio se não houver. Não invente.)
-- prazoDiasUteisSugerido (number: dias úteis; 15 para intimações quando não especificado; 0 se não houver prazo)
+- prazoDiasUteisSugerido (number: dias úteis do prazo legal quando o texto indicar; 15 para intimação com prazo CPC explícito; 0 se não houver prazo específico — o sistema usa 5 dias úteis internamente)
 - observacoesIa (string: urgência, valor da causa, riscos. Vazio se nada relevante.)
 - movimentacoes (array de { "tipo": string, "resumo": string }. Se vários atos no texto, um por ato.)
 

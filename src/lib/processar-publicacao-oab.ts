@@ -25,8 +25,44 @@ import {
   adicionarDiasUteis,
   formatarDataSql,
 } from "./calcular-prazo.js";
+import {
+  resolverDiasPrazoPublicacao,
+  ehTipoIntimacao,
+} from "./regra-prazo-publicacao.js";
 
-const DIAS_UTEIS_PRAZO_INTIMACAO = 15;
+async function inserirPrazoCalendario(opts: {
+  publicacaoId: number;
+  movimentacaoId?: number | null;
+  dataPub: string;
+  diasNoSistema: number;
+  numeroProcesso: string;
+  vara?: string | null;
+  textoCompleto?: string | null;
+  resumoMov?: string | null;
+  nomePrazo: string;
+  processoId?: number | null;
+}): Promise<number | undefined> {
+  const dataPrazoStr = formatarDataSql(
+    adicionarDiasUteis(opts.dataPub, opts.diasNoSistema)
+  );
+  const observacao = [opts.numeroProcesso, opts.vara].filter(Boolean).join(" | ");
+  const [prazo] = await db
+    .insert(prazos)
+    .values({
+      tipo: "civil",
+      data: dataPrazoStr,
+      observacao,
+      conteudo: opts.textoCompleto ?? opts.resumoMov ?? "",
+      prazo: opts.nomePrazo.slice(0, 255),
+      status: 0,
+      publicacaoOabId: opts.publicacaoId,
+      movimentacaoId: opts.movimentacaoId ?? null,
+      numeroProcesso: opts.numeroProcesso || null,
+      processoId: opts.processoId ?? null,
+    })
+    .returning({ id: prazos.id });
+  return prazo?.id;
+}
 
 /** Trunca string ao máximo permitido pelo varchar; evita "value too long" no banco. */
 function v(s: string | null | undefined, max: number): string | null {
@@ -147,6 +183,15 @@ export async function processarItemPublicacaoOab(
   const dateEmail = item.date ? new Date(item.date) : null;
   const dataPub = item.dataPublicacao ?? item.dataDisponibilizacao ?? "";
 
+  const temDadosIaPre =
+    item.resumo ||
+    item.observacoesIa ||
+    item.baseLegal ||
+    (Array.isArray(item.movimentacoes) && item.movimentacoes.length > 0);
+  const prazoFatalParaGravar = temDadosIaPre
+    ? resolverDiasPrazoPublicacao(item.prazoDiasUteisSugerido).diasFatal
+    : item.prazoDiasUteisSugerido ?? null;
+
   const [pub] = await db
     .insert(publicacoesOab)
     .values({
@@ -178,7 +223,7 @@ export async function processarItemPublicacaoOab(
       identificadorDocumento: v(identificadorDocumento || null, 100),
       resumo: item.resumo ?? null,
       baseLegal: v(item.baseLegal, 255),
-      prazoDiasUteisSugerido: item.prazoDiasUteisSugerido ?? null,
+      prazoDiasUteisSugerido: prazoFatalParaGravar,
       observacoesIa: item.observacoesIa ?? null,
       movimentacoes: item.movimentacoes ?? null,
       fontesEmail: [{ emailId: item.emailId ?? undefined, from: item.from, to: item.to }],
@@ -214,7 +259,6 @@ export async function processarItemPublicacaoOab(
 
   const prazoIds: number[] = [];
   const movs = Array.isArray(item.movimentacoes) ? item.movimentacoes : [];
-  const diasSugerido = item.prazoDiasUteisSugerido ?? DIAS_UTEIS_PRAZO_INTIMACAO;
 
   if (!temDadosIa) {
     const tipoPub = (item.tipoPublicacao ?? "").trim() || "Outros";
@@ -232,29 +276,22 @@ export async function processarItemPublicacaoOab(
       })
       .returning({ id: movimentacoes.id });
 
-    const tipoNorm = tipoPub.toLowerCase();
-    const ehIntimacaoPub =
-      tipoNorm.includes("intimação") || tipoNorm.includes("intimacao");
-    if (ehIntimacaoPub && dataPub) {
-      const dataLimite = adicionarDiasUteis(dataPub, DIAS_UTEIS_PRAZO_INTIMACAO);
-      const dataPrazoStr = formatarDataSql(dataLimite);
-      const observacao = [numeroProcesso, item.vara].filter(Boolean).join(" | ");
-      const nomePrazo = `Intimação ${numeroProcesso}`.slice(0, 255);
-      const [prazo] = await db
-        .insert(prazos)
-        .values({
-          tipo: "civil",
-          data: dataPrazoStr,
-          observacao,
-          conteudo: item.textoCompleto ?? "",
-          prazo: nomePrazo,
-          status: 0,
-          publicacaoOabId: publicacaoId,
-          movimentacaoId: movEmail?.id ?? null,
-          numeroProcesso: numeroProcesso || null,
-        })
-        .returning({ id: prazos.id });
-      if (prazo?.id) prazoIds.push(prazo.id);
+    if (ehTipoIntimacao(tipoPub) && dataPub) {
+      const resolvido = resolverDiasPrazoPublicacao(undefined, {
+        semAnaliseIa: true,
+        tipoPublicacao: tipoPub,
+      });
+      const prazoId = await inserirPrazoCalendario({
+        publicacaoId,
+        movimentacaoId: movEmail?.id,
+        dataPub,
+        diasNoSistema: resolvido.diasNoSistema,
+        numeroProcesso,
+        vara: item.vara,
+        textoCompleto: item.textoCompleto,
+        nomePrazo: `Intimação ${numeroProcesso}`,
+      });
+      if (prazoId) prazoIds.push(prazoId);
     }
 
     const oabsPublicacao = new Set<string>();
@@ -307,16 +344,17 @@ export async function processarItemPublicacaoOab(
     };
   }
 
+  const resolvidoIa = resolverDiasPrazoPublicacao(item.prazoDiasUteisSugerido);
+
   for (let ordem = 0; ordem < movs.length; ordem++) {
     const mov = movs[ordem];
     const tipo = (mov?.tipo ?? "").trim() || "Outros";
     const resumoMov = typeof mov?.resumo === "string" ? mov.resumo : null;
-    const ehIntimacao =
-      tipo.toLowerCase().includes("intimação") || tipo.toLowerCase().includes("intimacao");
-    const diasUteis = ehIntimacao ? diasSugerido : 0;
+    const ehIntimacao = ehTipoIntimacao(tipo);
+    const diasCalendario = ehIntimacao ? resolvidoIa.diasNoSistema : 0;
     const dataLimite =
-      diasUteis > 0 && dataPub
-        ? formatarDataSql(adicionarDiasUteis(dataPub, diasUteis))
+      diasCalendario > 0 && dataPub
+        ? formatarDataSql(adicionarDiasUteis(dataPub, diasCalendario))
         : null;
 
     const [movInserted] = await db
@@ -326,7 +364,7 @@ export async function processarItemPublicacaoOab(
         tipo: tipo.slice(0, 100),
         resumo: resumoMov,
         ordem: ordem + 1,
-        prazoDiasUteis: diasUteis > 0 ? diasUteis : null,
+        prazoDiasUteis: ehIntimacao ? resolvidoIa.diasFatal : null,
         dataLimite: dataLimite ?? null,
         baseLegal: v(item.baseLegal, 255),
         fonte: "ia",
@@ -334,50 +372,34 @@ export async function processarItemPublicacaoOab(
       .returning({ id: movimentacoes.id });
 
     if (ehIntimacao && movInserted?.id && dataLimite) {
-      const observacao = [numeroProcesso, item.vara].filter(Boolean).join(" | ");
-      const nomePrazo = `${tipo} ${numeroProcesso}`.slice(0, 255);
-      const [prazo] = await db
-        .insert(prazos)
-        .values({
-          tipo: "civil",
-          data: dataLimite,
-          observacao,
-          conteudo: item.textoCompleto ?? resumoMov ?? "",
-          prazo: nomePrazo,
-          status: 0,
-          publicacaoOabId: publicacaoId,
-          movimentacaoId: movInserted.id,
-          numeroProcesso: numeroProcesso || null,
-        })
-        .returning({ id: prazos.id });
-      if (prazo?.id) prazoIds.push(prazo.id);
+      const prazoId = await inserirPrazoCalendario({
+        publicacaoId,
+        movimentacaoId: movInserted.id,
+        dataPub,
+        diasNoSistema: resolvidoIa.diasNoSistema,
+        numeroProcesso,
+        vara: item.vara,
+        textoCompleto: item.textoCompleto,
+        resumoMov,
+        nomePrazo: `${tipo} ${numeroProcesso}`,
+      });
+      if (prazoId) prazoIds.push(prazoId);
     }
   }
 
-  if (prazoIds.length === 0 && movs.length === 0) {
-    const tipoNorm = (item.tipoPublicacao ?? "").toLowerCase();
-    const ehIntimacaoPub =
-      tipoNorm.includes("intimação") || tipoNorm.includes("intimacao");
-    if (ehIntimacaoPub && dataPub) {
-      const dataLimite = adicionarDiasUteis(dataPub, DIAS_UTEIS_PRAZO_INTIMACAO);
-      const dataPrazoStr = formatarDataSql(dataLimite);
-      const observacao = [numeroProcesso, item.vara].filter(Boolean).join(" | ");
-      const nomePrazo = `Intimação ${numeroProcesso}`.slice(0, 255);
-      const [prazo] = await db
-        .insert(prazos)
-        .values({
-          tipo: "civil",
-          data: dataPrazoStr,
-          observacao,
-          conteudo: item.textoCompleto ?? "",
-          prazo: nomePrazo,
-          status: 0,
-          publicacaoOabId: publicacaoId,
-          numeroProcesso: numeroProcesso || null,
-        })
-        .returning({ id: prazos.id });
-      if (prazo?.id) prazoIds.push(prazo.id);
-    }
+  if (prazoIds.length === 0 && dataPub) {
+    const resolvido = resolverDiasPrazoPublicacao(item.prazoDiasUteisSugerido);
+    const tipoNome = (item.tipoPublicacao ?? "Cumprimento").trim() || "Cumprimento";
+    const prazoId = await inserirPrazoCalendario({
+      publicacaoId,
+      dataPub,
+      diasNoSistema: resolvido.diasNoSistema,
+      numeroProcesso,
+      vara: item.vara,
+      textoCompleto: item.textoCompleto,
+      nomePrazo: `${tipoNome} ${numeroProcesso}`,
+    });
+    if (prazoId) prazoIds.push(prazoId);
   }
 
   const oabsPublicacao = new Set<string>();
@@ -458,8 +480,14 @@ export async function criarPrazosAPartirDePublicacao(
   await db.delete(prazos).where(eq(prazos.publicacaoOabId, publicacaoId));
   await db.delete(movimentacoes).where(eq(movimentacoes.publicacaoOabId, publicacaoId));
 
+  const resolvidoGravacao = resolverDiasPrazoPublicacao(row.prazoDiasUteisSugerido);
+  await db
+    .update(publicacoesOab)
+    .set({ prazoDiasUteisSugerido: resolvidoGravacao.diasFatal })
+    .where(eq(publicacoesOab.id, publicacaoId));
+
   const prazoIds: number[] = [];
-  const diasSugerido = row.prazoDiasUteisSugerido ?? DIAS_UTEIS_PRAZO_INTIMACAO;
+  const resolvidoIa = resolvidoGravacao;
   let dataPub = row.dataPublicacao ?? row.dataDisponibilizacao ?? "";
   if (!dataPub && row.dataProcessamento) {
     const match = String(row.dataProcessamento).match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
@@ -481,12 +509,11 @@ export async function criarPrazosAPartirDePublicacao(
     const mov = movs[ordem];
     const tipo = (mov?.tipo ?? "").trim() || "Outros";
     const resumoMov = typeof mov?.resumo === "string" ? mov.resumo : null;
-    const ehIntimacao =
-      tipo.toLowerCase().includes("intimação") || tipo.toLowerCase().includes("intimacao");
-    const diasUteis = ehIntimacao ? diasSugerido : 0;
+    const ehIntimacao = ehTipoIntimacao(tipo);
+    const diasCalendario = ehIntimacao ? resolvidoIa.diasNoSistema : 0;
     const dataLimite =
-      diasUteis > 0 && dataPub
-        ? formatarDataSql(adicionarDiasUteis(dataPub, diasUteis))
+      diasCalendario > 0 && dataPub
+        ? formatarDataSql(adicionarDiasUteis(dataPub, diasCalendario))
         : null;
 
     const [movInserted] = await db
@@ -496,7 +523,7 @@ export async function criarPrazosAPartirDePublicacao(
         tipo: tipo.slice(0, 100),
         resumo: resumoMov,
         ordem: ordem + 1,
-        prazoDiasUteis: diasUteis > 0 ? diasUteis : null,
+        prazoDiasUteis: ehIntimacao ? resolvidoIa.diasFatal : null,
         dataLimite: dataLimite ?? null,
         baseLegal: v(row.baseLegal, 255),
         fonte: "ia",
@@ -504,52 +531,35 @@ export async function criarPrazosAPartirDePublicacao(
       .returning({ id: movimentacoes.id });
 
     if (ehIntimacao && movInserted?.id && dataLimite) {
-      const observacao = [numeroProcesso, vara].filter(Boolean).join(" | ");
-      const nomePrazo = `${tipo} ${numeroProcesso}`.slice(0, 255);
-      const [prazo] = await db
-        .insert(prazos)
-        .values({
-          tipo: "civil",
-          data: dataLimite,
-          observacao,
-          conteudo: row.textoCompleto ?? resumoMov ?? "",
-          prazo: nomePrazo,
-          status: 0,
-          publicacaoOabId: publicacaoId,
-          movimentacaoId: movInserted.id,
-          numeroProcesso: numeroProcesso || null,
-          processoId: row.processoId ?? null,
-        })
-        .returning({ id: prazos.id });
-      if (prazo?.id) prazoIds.push(prazo.id);
+      const prazoId = await inserirPrazoCalendario({
+        publicacaoId,
+        movimentacaoId: movInserted.id,
+        dataPub,
+        diasNoSistema: resolvidoIa.diasNoSistema,
+        numeroProcesso,
+        vara,
+        textoCompleto: row.textoCompleto,
+        resumoMov,
+        nomePrazo: `${tipo} ${numeroProcesso}`,
+        processoId: row.processoId,
+      });
+      if (prazoId) prazoIds.push(prazoId);
     }
   }
 
-  if (prazoIds.length === 0 && movs.length === 0) {
-    const tipoNorm = (row.tipoPublicacao ?? "").toLowerCase();
-    const ehIntimacaoPub =
-      tipoNorm.includes("intimação") || tipoNorm.includes("intimacao");
-    if (ehIntimacaoPub && dataPub) {
-      const dataLimite = adicionarDiasUteis(dataPub, DIAS_UTEIS_PRAZO_INTIMACAO);
-      const dataPrazoStr = formatarDataSql(dataLimite);
-      const observacao = [numeroProcesso, vara].filter(Boolean).join(" | ");
-      const nomePrazo = `Intimação ${numeroProcesso}`.slice(0, 255);
-      const [prazo] = await db
-        .insert(prazos)
-        .values({
-          tipo: "civil",
-          data: dataPrazoStr,
-          observacao,
-          conteudo: row.textoCompleto ?? "",
-          prazo: nomePrazo,
-          status: 0,
-          publicacaoOabId: publicacaoId,
-          numeroProcesso: numeroProcesso || null,
-          processoId: row.processoId ?? null,
-        })
-        .returning({ id: prazos.id });
-      if (prazo?.id) prazoIds.push(prazo.id);
-    }
+  if (prazoIds.length === 0 && dataPub) {
+    const tipoNome = (row.tipoPublicacao ?? "Cumprimento").trim() || "Cumprimento";
+    const prazoId = await inserirPrazoCalendario({
+      publicacaoId,
+      dataPub,
+      diasNoSistema: resolvidoIa.diasNoSistema,
+      numeroProcesso,
+      vara,
+      textoCompleto: row.textoCompleto,
+      nomePrazo: `${tipoNome} ${numeroProcesso}`,
+      processoId: row.processoId,
+    });
+    if (prazoId) prazoIds.push(prazoId);
   }
 
   const oabsPublicacao = new Set<string>();
