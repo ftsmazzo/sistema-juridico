@@ -6,7 +6,6 @@ import {
   updatePublicacao,
   dispararAnaliseN8n,
   recriarPrazosPublicacao,
-  criarProcessoDePublicacao,
   type PublicacaoDetalhe,
 } from "@/lib/api";
 
@@ -164,14 +163,6 @@ export function DetalhePublicacao() {
     },
   });
 
-  const criarProcessoMutation = useMutation({
-    mutationFn: () => criarProcessoDePublicacao(pubId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["publicacao", pubId] });
-      queryClient.invalidateQueries({ queryKey: ["processos"] });
-    },
-  });
-
   const handleSave = () => {
     mutation.mutate(form);
   };
@@ -322,27 +313,14 @@ export function DetalhePublicacao() {
       {pub.numeroProcesso && !pub.processoId && (
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-foreground">
-            Esta publicação ainda não está vinculada a um processo no cadastro. Novas publicações passam a
-            criar o processo automaticamente; para esta, vincule agora.
+            Vincule a um cliente da base (ou cadastre um novo) e ao processo para completar o fluxo
+            cliente → processo → publicação → prazo.
           </p>
-          <button
-            type="button"
-            onClick={() => criarProcessoMutation.mutate()}
-            disabled={criarProcessoMutation.isPending}
-            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {criarProcessoMutation.isPending ? "Vinculando…" : "Criar / vincular processo"}
-          </button>
-        </div>
-      )}
-      {criarProcessoMutation.isSuccess && (
-        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
-          {criarProcessoMutation.data?.message}{" "}
           <Link
-            to={`/processos/${criarProcessoMutation.data?.processoId}`}
-            className="font-medium text-primary underline"
+            to={`/processos/novo-por-documento?publicacaoId=${pub.id}`}
+            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            Abrir processo
+            Cadastrar processo e cliente
           </Link>
         </div>
       )}

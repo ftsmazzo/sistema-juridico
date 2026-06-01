@@ -297,23 +297,101 @@ export function recriarPrazosPublicacao(id: number) {
   );
 }
 
-export function criarProcessoDePublicacao(id: number) {
+export type ClienteSugerido = {
+  id: number;
+  tipo: string;
+  nome: string;
+  razaoSocial: string | null;
+  cpf: string | null;
+  cnpj: string | null;
+  score: number;
+  motivo: string;
+};
+
+export type PrepararProcessoResponse = {
+  ok: boolean;
+  publicacaoId?: number;
+  processo: {
+    numeroCnj: string;
+    vara?: string | null;
+    comarca?: string | null;
+    instancia?: string | null;
+    tipoAcao?: string | null;
+    nomeCliente?: string | null;
+    qualificacaoCliente?: string | null;
+    outroEnvolvido?: string | null;
+    qualificacaoOutro?: string | null;
+    valorCausa?: string | null;
+    status?: string | null;
+    observacoes?: string | null;
+  };
+  cliente: {
+    tipoSugerido: "PF" | "PJ";
+    nome: string | null;
+    razaoSocial: string | null;
+    cpf: string | null;
+    cnpj: string | null;
+    qualificacaoCliente: string | null;
+  };
+  clientesSugeridos: ClienteSugerido[];
+  processoExistenteId: number | null;
+  camposObrigatoriosFaltando: string[];
+  exigeConfirmacao: boolean;
+};
+
+export type ProcessoFormConfirmar = {
+  numeroCnj: string;
+  status?: string;
+  vara?: string | null;
+  comarca?: string | null;
+  instancia?: string | null;
+  tipoAcao?: string | null;
+  qualificacaoCliente?: string | null;
+  outroEnvolvido?: string | null;
+  qualificacaoOutro?: string | null;
+  valorCausa?: string | null;
+  observacoes?: string | null;
+  cliente:
+    | { modo: "existente"; idCliente: number }
+    | {
+        modo: "novo";
+        tipo: "PF" | "PJ";
+        nome: string;
+        razaoSocial?: string | null;
+        cpf?: string | null;
+        cnpj?: string | null;
+      };
+  publicacaoId?: number;
+};
+
+export function prepararProcessoDePublicacao(publicacaoId: number) {
+  return api.get<PrepararProcessoResponse>(
+    `/api/publicacoes/${publicacaoId}/preparar-processo`
+  );
+}
+
+export function extrairProcessoPorDocumento(
+  imageBase64: string,
+  opcoes?: { provider?: ProvedorIa; model?: string }
+) {
+  return api.post<PrepararProcessoResponse>("/api/processos/por-documento/extrair", {
+    image: imageBase64,
+    ...(opcoes?.provider && { provider: opcoes.provider }),
+    ...(opcoes?.model && { model: opcoes.model }),
+  });
+}
+
+export function confirmarProcessoPorDocumento(body: ProcessoFormConfirmar) {
   return api.post<{
     ok: boolean;
     processoId: number;
+    clienteId: number;
     criado: boolean;
+    clienteCriado: boolean;
+    publicacoesVinculadas: number;
     message: string;
-  }>(`/api/publicacoes/${id}/criar-processo`);
+  }>("/api/processos/por-documento/confirmar", body);
 }
-
-export type ProcessoPorDocumentoResponse = {
-  processoId: number;
-  criado: boolean;
-  numeroCnj: string;
-  publicacoesVinculadas: number;
-  message: string;
-  extraido?: Record<string, unknown>;
-};
 
 export function vincularPublicacoesOrfasProcessos() {
   return api.post<{

@@ -2,6 +2,7 @@ import { db } from "../db/index.js";
 import { publicacoesOab, prazos, processos } from "../db/schema.js";
 import { eq, sql, and, isNull } from "drizzle-orm";
 import { formatarCnjParaGravar, normalizarNumeroCnj } from "./normalizar-cnj.js";
+import { buscarClientesSugeridos } from "./buscar-cliente.js";
 
 export type DadosProcessoSugeridos = {
   vara?: string | null;
@@ -123,14 +124,21 @@ export async function garantirProcessoParaPublicacao(
         ? `${poloAtivo} x ${outro}`.slice(0, 400)
         : poloAtivo?.slice(0, 400) ?? null;
 
+    let idCliente: number | undefined;
+    if (poloAtivo) {
+      const sugestoes = await buscarClientesSugeridos({ nome: poloAtivo, limite: 1 });
+      if (sugestoes[0]?.score >= 75) idCliente = sugestoes[0].id;
+    }
+
     const [inserted] = await db
       .insert(processos)
       .values({
         numeroCnj: numeroGravar,
         status: "Ativo",
+        idCliente,
+        nomeCliente: poloAtivo?.slice(0, 255) ?? undefined,
         vara: (dados.vara ?? pub.vara)?.slice(0, 120) ?? undefined,
         comarca: dados.comarca?.slice(0, 120) ?? (pub.local?.slice(0, 120) || undefined),
-        nomeCliente: poloAtivo?.slice(0, 255) ?? undefined,
         outroEnvolvido: outro?.slice(0, 255) ?? undefined,
         tipoAcao: dados.tipoAcao?.slice(0, 120) ?? pub.tipoPublicacao?.slice(0, 120) ?? undefined,
         linkProcesso: dados.urlDocumento?.slice(0, 500) ?? pub.urlDocumento?.slice(0, 500) ?? undefined,

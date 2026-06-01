@@ -19,8 +19,12 @@ import {
   updatePublicacao,
   recriarPrazosPublicacao,
   criarProcessoDePublicacao,
+  prepararProcessoDePublicacao,
 } from "./routes/publicacoes.js";
-import { processoPorDocumento } from "./routes/processos-por-documento.js";
+import {
+  extrairProcessoPorDocumento,
+  confirmarProcessoPorDocumento,
+} from "./routes/processos-por-documento.js";
 import { dispararAnaliseN8n } from "./routes/publicacoes-disparar-n8n.js";
 import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
 import { login } from "./routes/auth.js";
@@ -103,6 +107,7 @@ app.post("/api/prazos/:id/sugerir-subtarefas", requireAuth, sugerirSubtarefas);
 app.patch("/api/prazos/:id/subtarefas/:idItem", requireAuth, updateSubtarefa);
 app.delete("/api/prazos/:id/subtarefas/:idItem", requireAuth, deleteSubtarefa);
 app.get("/api/publicacoes", listPublicacoes);
+app.get("/api/publicacoes/:id/preparar-processo", requireAuth, prepararProcessoDePublicacao);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);
 app.post("/api/publicacoes/:id/recriar-prazos", requireAuth, recriarPrazosPublicacao);
@@ -129,7 +134,8 @@ app.post("/api/processos/enriquecer-escavador", requireAuth, enriquecerProcessos
 app.get("/api/processos/:id", requireAuth, getProcessoById);
 app.post("/api/processos/:id/popular-movimentacoes-publicacoes", requireAuth, popularMovimentacoesPublicacoes);
 app.post("/api/processos/:id/popular-movimentacoes-escavador", requireAuth, popularMovimentacoesEscavador);
-app.post("/api/processos/por-documento", requireAuth, processoPorDocumento);
+app.post("/api/processos/por-documento/extrair", requireAuth, extrairProcessoPorDocumento);
+app.post("/api/processos/por-documento/confirmar", requireAuth, confirmarProcessoPorDocumento);
 app.post("/api/processos/vincular-publicacoes-orfas", requireAuth, vincularPublicacoesOrfas);
 app.post("/api/processos", requireAuth, createProcesso);
 app.patch("/api/processos/:id", requireAuth, updateProcesso);

@@ -19,6 +19,10 @@ Extraia os dados para cadastro no escritório. Retorne APENAS um JSON válido (s
   "instancia": "1º grau, 2º grau, etc.",
   "tipoAcao": "tipo da ação (ex.: Procedimento Comum, Cumprimento de Sentença)",
   "nomeCliente": "nome da parte que representamos ou polo do cliente do escritório",
+  "clienteTipo": "PF ou PJ",
+  "clienteCpf": "CPF se pessoa física (somente números ou formatado)",
+  "clienteCnpj": "CNPJ se pessoa jurídica",
+  "clienteRazaoSocial": "razão social se PJ",
   "qualificacaoCliente": "autor, réu, exequente, etc.",
   "outroEnvolvido": "parte contrária principal",
   "qualificacaoOutro": "qualificação da parte contrária",
@@ -36,6 +40,10 @@ export type ProcessoExtraidoIa = {
   instancia?: string | null;
   tipoAcao?: string | null;
   nomeCliente?: string | null;
+  clienteTipo?: string | null;
+  clienteCpf?: string | null;
+  clienteCnpj?: string | null;
+  clienteRazaoSocial?: string | null;
   qualificacaoCliente?: string | null;
   outroEnvolvido?: string | null;
   qualificacaoOutro?: string | null;

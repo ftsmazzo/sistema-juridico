@@ -10,6 +10,8 @@ import {
 import { desc, eq, asc, sql } from "drizzle-orm";
 import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
 import { garantirProcessoParaPublicacao } from "../lib/vincular-publicacao-processo.js";
+import { prepararCadastroProcesso } from "../lib/cadastrar-processo-com-clientes.js";
+import type { ProcessoExtraidoIa } from "../lib/extrair-processo-por-ia.js";
 import type { RequestWithUser } from "../middleware/auth.js";
 
 export type PublicacaoListItem = {
@@ -405,8 +407,61 @@ export async function updatePublicacao(
  * Recalcula prazos a partir dos dados de IA já gravados (regra 5 du fatal / 3 du no calendário quando sem prazo específico).
  */
 /**
+ * GET /api/publicacoes/:id/preparar-processo
+ * Monta preview para formulário de cadastro de processo + cliente a partir da publicação.
+ */
+export async function prepararProcessoDePublicacao(
+  req: RequestWithUser,
+  res: Response
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    const [row] = await db
+      .select()
+      .from(publicacoesOab)
+      .where(eq(publicacoesOab.id, id))
+      .limit(1);
+    if (!row) {
+      res.status(404).json({ error: "Publicação não encontrada" });
+      return;
+    }
+    const polosPassivos = Array.isArray(row.polosPassivos) ? row.polosPassivos : [];
+    const extraido: ProcessoExtraidoIa = {
+      numeroCnj: row.numeroProcesso ?? undefined,
+      vara: row.vara ?? undefined,
+      comarca: row.local ?? undefined,
+      tipoAcao: row.tipoPublicacao ?? undefined,
+      nomeCliente: row.poloAtivo ?? undefined,
+      outroEnvolvido: polosPassivos[0] ?? undefined,
+      valorCausa: row.valorMencionado ?? undefined,
+      observacoes: row.resumo ?? row.observacoesIa ?? undefined,
+      status: "Ativo",
+    };
+    const preparado = await prepararCadastroProcesso(extraido, {
+      nomeClienteOverride: row.poloAtivo,
+    });
+    res.json({
+      ok: true,
+      publicacaoId: id,
+      ...preparado,
+    });
+  } catch (err) {
+    console.error("prepararProcessoDePublicacao:", err);
+    res.status(500).json({ error: "Erro ao preparar cadastro do processo." });
+  }
+}
+
+/**
  * POST /api/publicacoes/:id/criar-processo
- * Cria processo mínimo a partir da publicação (ou vincula ao existente) e associa publicações/prazos do mesmo CNJ.
+ * @deprecated Preferir preparar-processo + confirmar em /api/processos/por-documento/confirmar
  */
 export async function criarProcessoDePublicacao(
   req: RequestWithUser,
