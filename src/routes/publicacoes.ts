@@ -180,6 +180,74 @@ export type PublicacaoDetalhe = {
   createdAt: string;
 };
 
+type PublicacaoRow = typeof publicacoesOab.$inferSelect;
+type MovComFonte = {
+  tipo: string;
+  resumo: string | null;
+  ordem: number;
+  fonte: string;
+};
+
+async function montarPublicacaoDetalhe(
+  row: PublicacaoRow,
+  movsComFonte: MovComFonte[]
+): Promise<PublicacaoDetalhe> {
+  let processoNumeroCnj: string | null = null;
+  if (row.processoId) {
+    const [proc] = await db
+      .select({ numeroCnj: processos.numeroCnj })
+      .from(processos)
+      .where(eq(processos.id, row.processoId))
+      .limit(1);
+    processoNumeroCnj = proc?.numeroCnj ?? null;
+  }
+
+  return {
+    id: row.id,
+    emailId: row.emailId,
+    subject: row.subject,
+    dateEmail: row.dateEmail ? row.dateEmail.toISOString() : null,
+    fromEmail: row.fromEmail,
+    toEmail: row.toEmail,
+    advogadoPrincipal: row.advogadoPrincipal,
+    numeroOab: row.numeroOab,
+    dataProcessamento: row.dataProcessamento,
+    totalPublicacoes: row.totalPublicacoes,
+    publicacaoNumero: row.publicacaoNumero,
+    dataDisponibilizacao: row.dataDisponibilizacao,
+    dataPublicacao: row.dataPublicacao,
+    jornal: row.jornal,
+    pagina: row.pagina,
+    caderno: row.caderno,
+    local: row.local,
+    vara: row.vara,
+    tipoPublicacao: row.tipoPublicacao,
+    numeroProcesso: row.numeroProcesso,
+    valorMencionado: row.valorMencionado,
+    textoCompleto: row.textoCompleto,
+    advogados: row.advogados ?? null,
+    poloAtivo: row.poloAtivo,
+    polosPassivos: row.polosPassivos ?? null,
+    urlDocumento: row.urlDocumento,
+    identificadorDocumento: row.identificadorDocumento,
+    resumo: row.resumo,
+    baseLegal: row.baseLegal,
+    prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
+    observacoesIa: row.observacoesIa,
+    movimentacoes: row.movimentacoes ?? null,
+    movimentacoesComFonte: movsComFonte.map((m) => ({
+      tipo: m.tipo,
+      resumo: m.resumo,
+      ordem: m.ordem,
+      fonte: m.fonte,
+    })),
+    fontesEmail: (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[],
+    processoId: row.processoId ?? null,
+    processoNumeroCnj,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 /**
  * GET /api/publicacoes/:id
  * Retorna uma publicação por id.
@@ -217,60 +285,7 @@ export async function getPublicacaoById(
       .where(eq(movimentacoesTable.publicacaoOabId, id))
       .orderBy(asc(movimentacoesTable.ordem), asc(movimentacoesTable.id));
 
-    let processoNumeroCnj: string | null = null;
-    if (row.processoId) {
-      const [proc] = await db
-        .select({ numeroCnj: processos.numeroCnj })
-        .from(processos)
-        .where(eq(processos.id, row.processoId))
-        .limit(1);
-      processoNumeroCnj = proc?.numeroCnj ?? null;
-    }
-
-    res.json({
-      id: row.id,
-      emailId: row.emailId,
-      subject: row.subject,
-      dateEmail: row.dateEmail ? row.dateEmail.toISOString() : null,
-      fromEmail: row.fromEmail,
-      toEmail: row.toEmail,
-      advogadoPrincipal: row.advogadoPrincipal,
-      numeroOab: row.numeroOab,
-      dataProcessamento: row.dataProcessamento,
-      totalPublicacoes: row.totalPublicacoes,
-      publicacaoNumero: row.publicacaoNumero,
-      dataDisponibilizacao: row.dataDisponibilizacao,
-      dataPublicacao: row.dataPublicacao,
-      jornal: row.jornal,
-      pagina: row.pagina,
-      caderno: row.caderno,
-      local: row.local,
-      vara: row.vara,
-      tipoPublicacao: row.tipoPublicacao,
-      numeroProcesso: row.numeroProcesso,
-      valorMencionado: row.valorMencionado,
-      textoCompleto: row.textoCompleto,
-      advogados: row.advogados ?? null,
-      poloAtivo: row.poloAtivo,
-      polosPassivos: row.polosPassivos ?? null,
-      urlDocumento: row.urlDocumento,
-      identificadorDocumento: row.identificadorDocumento,
-      resumo: row.resumo,
-      baseLegal: row.baseLegal,
-      prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
-      observacoesIa: row.observacoesIa,
-      movimentacoes: row.movimentacoes ?? null,
-      movimentacoesComFonte: movsComFonte.map((m) => ({
-        tipo: m.tipo,
-        resumo: m.resumo,
-        ordem: m.ordem,
-        fonte: m.fonte,
-      })),
-      fontesEmail: (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[],
-      processoId: row.processoId ?? null,
-      processoNumeroCnj,
-      createdAt: row.createdAt.toISOString(),
-    });
+    res.json(await montarPublicacaoDetalhe(row, movsComFonte));
   } catch (err) {
     console.error("Get publicacao error:", err);
     res.status(500).json({ error: "Erro ao carregar publicação" });
@@ -354,48 +369,7 @@ export async function updatePublicacao(
       .where(eq(movimentacoesTable.publicacaoOabId, id))
       .orderBy(asc(movimentacoesTable.ordem), asc(movimentacoesTable.id));
 
-    res.json({
-      id: row.id,
-      emailId: row.emailId,
-      subject: row.subject,
-      dateEmail: row.dateEmail ? row.dateEmail.toISOString() : null,
-      fromEmail: row.fromEmail,
-      toEmail: row.toEmail,
-      advogadoPrincipal: row.advogadoPrincipal,
-      numeroOab: row.numeroOab,
-      dataProcessamento: row.dataProcessamento,
-      totalPublicacoes: row.totalPublicacoes,
-      publicacaoNumero: row.publicacaoNumero,
-      dataDisponibilizacao: row.dataDisponibilizacao,
-      dataPublicacao: row.dataPublicacao,
-      jornal: row.jornal,
-      pagina: row.pagina,
-      caderno: row.caderno,
-      local: row.local,
-      vara: row.vara,
-      tipoPublicacao: row.tipoPublicacao,
-      numeroProcesso: row.numeroProcesso,
-      valorMencionado: row.valorMencionado,
-      textoCompleto: row.textoCompleto,
-      advogados: row.advogados ?? null,
-      poloAtivo: row.poloAtivo,
-      polosPassivos: row.polosPassivos ?? null,
-      urlDocumento: row.urlDocumento,
-      identificadorDocumento: row.identificadorDocumento,
-      resumo: row.resumo,
-      baseLegal: row.baseLegal,
-      prazoDiasUteisSugerido: row.prazoDiasUteisSugerido,
-      observacoesIa: row.observacoesIa,
-      movimentacoes: row.movimentacoes ?? null,
-      movimentacoesComFonte: movsComFonte.map((m) => ({
-        tipo: m.tipo,
-        resumo: m.resumo,
-        ordem: m.ordem,
-        fonte: m.fonte,
-      })),
-      fontesEmail: (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[],
-      createdAt: row.createdAt.toISOString(),
-    });
+    res.json(await montarPublicacaoDetalhe(row, movsComFonte));
   } catch (err) {
     console.error("Update publicacao error:", err);
     res.status(500).json({ error: "Erro ao atualizar publicação" });
