@@ -4,8 +4,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
+COPY web/package.json web/package-lock.json* ./
+# npm install: lock pode ficar atrás do package.json entre deploys (ex.: deps removidas/ajustadas)
+RUN npm install
 
 COPY web/ .
 ARG VITE_API_URL
