@@ -10,6 +10,7 @@ import { NovaPublicacao } from "@/pages/NovaPublicacao";
 import { TestarEmailRecorte } from "@/pages/TestarEmailRecorte";
 import { MonitoramentoEmail } from "@/pages/MonitoramentoEmail";
 import { Processos } from "@/pages/Processos";
+import { ProcessoPorDocumento } from "@/pages/ProcessoPorDocumento";
 import { DetalheProcesso } from "@/pages/DetalheProcesso";
 import { Pessoas } from "@/pages/Pessoas";
 import { Usuarios } from "@/pages/Usuarios";
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="monitoramento-email" element={<MonitoramentoEmail />} />
           <Route path="publicacoes/:id" element={<DetalhePublicacao />} />
           <Route path="processos" element={<Processos />} />
+          <Route path="processos/novo-por-documento" element={<ProcessoPorDocumento />} />
           <Route path="processos/:id" element={<DetalheProcesso />} />
           <Route path="pessoas" element={<Pessoas />} />
           <Route path="usuarios" element={<Usuarios />} />

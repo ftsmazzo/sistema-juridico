@@ -12,6 +12,7 @@ import {
   getDadosEscavador,
   sincronizarDadosEscavador,
   enriquecerProcessosEscavador,
+  vincularPublicacoesOrfasProcessos,
   type ProcessoListItem,
   type ResultadoImportacao,
   type SincronizarEscavadorResultado,
@@ -139,6 +140,18 @@ export function Processos() {
     mutationFn: enriquecerProcessosEscavador,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["processos"] });
+    },
+  });
+
+  const vincularOrfasMutation = useMutation({
+    mutationFn: vincularPublicacoesOrfasProcessos,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["processos"] });
+      queryClient.invalidateQueries({ queryKey: ["publicacoes"] });
+      alert(data.message);
+    },
+    onError: (err) => {
+      alert(err instanceof Error ? err.message : "Erro ao vincular publicações.");
     },
   });
 
@@ -279,6 +292,21 @@ export function Processos() {
           >
             Importar Excel
           </button>
+          <button
+            type="button"
+            onClick={() => vincularOrfasMutation.mutate()}
+            disabled={vincularOrfasMutation.isPending}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted/50 disabled:opacity-50"
+            title="Cria processos mínimos e vincula publicações que têm número CNJ mas ainda não estão no cadastro de processos."
+          >
+            {vincularOrfasMutation.isPending ? "Vinculando…" : "Vincular publicações"}
+          </button>
+          <Link
+            to="/processos/novo-por-documento"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20"
+          >
+            Por imagem / PDF
+          </Link>
           <button
             type="button"
             onClick={openNew}

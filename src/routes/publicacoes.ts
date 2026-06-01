@@ -1,8 +1,16 @@
 import { Request, Response } from "express";
 import { db } from "../db/index.js";
-import { publicacoesOab, movimentacoes as movimentacoesTable, usuarios, pessoas } from "../db/schema.js";
+import {
+  publicacoesOab,
+  movimentacoes as movimentacoesTable,
+  processos,
+  usuarios,
+  pessoas,
+} from "../db/schema.js";
 import { desc, eq, asc, sql } from "drizzle-orm";
 import { criarPrazosAPartirDePublicacao } from "../lib/processar-publicacao-oab.js";
+import { garantirProcessoParaPublicacao } from "../lib/vincular-publicacao-processo.js";
+import type { RequestWithUser } from "../middleware/auth.js";
 
 export type PublicacaoListItem = {
   id: number;
@@ -165,6 +173,8 @@ export type PublicacaoDetalhe = {
   /** Movimentações da tabela (com fonte: email | ia | escavador) */
   movimentacoesComFonte: { tipo: string; resumo: string | null; ordem: number; fonte: string }[];
   fontesEmail: { emailId?: string; from?: string; to?: string }[];
+  processoId: number | null;
+  processoNumeroCnj: string | null;
   createdAt: string;
 };
 
@@ -204,6 +214,16 @@ export async function getPublicacaoById(
       .from(movimentacoesTable)
       .where(eq(movimentacoesTable.publicacaoOabId, id))
       .orderBy(asc(movimentacoesTable.ordem), asc(movimentacoesTable.id));
+
+    let processoNumeroCnj: string | null = null;
+    if (row.processoId) {
+      const [proc] = await db
+        .select({ numeroCnj: processos.numeroCnj })
+        .from(processos)
+        .where(eq(processos.id, row.processoId))
+        .limit(1);
+      processoNumeroCnj = proc?.numeroCnj ?? null;
+    }
 
     res.json({
       id: row.id,
@@ -245,6 +265,8 @@ export async function getPublicacaoById(
         fonte: m.fonte,
       })),
       fontesEmail: (row.fontesEmail ?? []) as { emailId?: string; from?: string; to?: string }[],
+      processoId: row.processoId ?? null,
+      processoNumeroCnj,
       createdAt: row.createdAt.toISOString(),
     });
   } catch (err) {
@@ -382,6 +404,61 @@ export async function updatePublicacao(
  * POST /api/publicacoes/:id/recriar-prazos
  * Recalcula prazos a partir dos dados de IA já gravados (regra 5 du fatal / 3 du no calendário quando sem prazo específico).
  */
+/**
+ * POST /api/publicacoes/:id/criar-processo
+ * Cria processo mínimo a partir da publicação (ou vincula ao existente) e associa publicações/prazos do mesmo CNJ.
+ */
+export async function criarProcessoDePublicacao(
+  req: RequestWithUser,
+  res: Response<
+    | { ok: boolean; processoId: number; criado: boolean; message: string }
+    | { error: string }
+  >
+): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Não autenticado" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "ID inválido" });
+      return;
+    }
+    const [row] = await db
+      .select({ id: publicacoesOab.id, numeroProcesso: publicacoesOab.numeroProcesso })
+      .from(publicacoesOab)
+      .where(eq(publicacoesOab.id, id))
+      .limit(1);
+    if (!row) {
+      res.status(404).json({ error: "Publicação não encontrada" });
+      return;
+    }
+    if (!row.numeroProcesso?.trim()) {
+      res.status(400).json({ error: "Publicação sem número de processo." });
+      return;
+    }
+    const { processoId, criado } = await garantirProcessoParaPublicacao(id, {
+      criarSeAusente: true,
+    });
+    if (!processoId) {
+      res.status(500).json({ error: "Não foi possível criar ou vincular o processo." });
+      return;
+    }
+    res.json({
+      ok: true,
+      processoId,
+      criado,
+      message: criado
+        ? "Processo criado e publicação vinculada."
+        : "Processo já existia; publicação vinculada.",
+    });
+  } catch (err) {
+    console.error("criarProcessoDePublicacao:", err);
+    res.status(500).json({ error: "Erro ao criar processo a partir da publicação." });
+  }
+}
+
 export async function recriarPrazosPublicacao(
   req: Request,
   res: Response<{ ok: boolean; prazoIds: number[] } | { error: string }>

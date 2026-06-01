@@ -29,6 +29,15 @@ import {
   resolverDiasPrazoPublicacao,
   ehTipoIntimacao,
 } from "./regra-prazo-publicacao.js";
+import { garantirProcessoParaPublicacao } from "./vincular-publicacao-processo.js";
+
+async function finalizarPublicacaoProcessada(publicacaoId: number): Promise<void> {
+  try {
+    await garantirProcessoParaPublicacao(publicacaoId, { criarSeAusente: true });
+  } catch (err) {
+    console.error("garantirProcessoParaPublicacao:", err);
+  }
+}
 
 async function inserirPrazoCalendario(opts: {
   publicacaoId: number;
@@ -337,6 +346,7 @@ export async function processarItemPublicacaoOab(
         });
       }
     }
+    await finalizarPublicacaoProcessada(publicacaoId);
     return {
       publicacaoId,
       prazoIds: prazoIds.length > 0 ? prazoIds : undefined,
@@ -447,6 +457,7 @@ export async function processarItemPublicacaoOab(
     }
   }
 
+  await finalizarPublicacaoProcessada(publicacaoId);
   return {
     publicacaoId,
     prazoIds: prazoIds.length > 0 ? prazoIds : undefined,

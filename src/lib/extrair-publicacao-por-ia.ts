@@ -200,8 +200,21 @@ export async function extrairPublicacaoDeImagem(
   imageBase64: string,
   opcoes?: OpcoesExtracao
 ): Promise<Partial<ItemPublicacaoOab>[]> {
-  const { data: base64Data, mediaType } = normalizarBase64(imageBase64);
   const prompt = process.env.PUBLICACOES_PRINT_PROMPT ?? PROMPT_PADRAO;
+  return extrairJsonDeImagemComPrompt(imageBase64, prompt, opcoes, (parsed) => {
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.map((p) => mapParsedToItem(p as ExtracaoParsed));
+  });
+}
+
+/** Extração genérica por visão (publicação, processo, capa, etc.). */
+export async function extrairJsonDeImagemComPrompt<T>(
+  imageBase64: string,
+  prompt: string,
+  opcoes: OpcoesExtracao | undefined,
+  mapResult: (parsed: unknown) => T
+): Promise<T> {
+  const { data: base64Data, mediaType } = normalizarBase64(imageBase64);
   const provider = opcoes?.provider ?? (process.env.OPENAI_API_KEY ? "openai" : "claude");
   const model =
     opcoes?.model ??
@@ -209,8 +222,94 @@ export async function extrairPublicacaoDeImagem(
       ? process.env.CLAUDE_VISION_MODEL ?? "claude-sonnet-4-20250514"
       : process.env.OPENAI_VISION_MODEL ?? "gpt-4o");
 
+  let parsedList: unknown[];
   if (provider === "claude") {
-    return extrairComClaude(base64Data, mediaType, prompt, model);
+    parsedList = await extrairComClaudeRaw(base64Data, mediaType, prompt, model);
+  } else {
+    parsedList = await extrairComOpenAIRaw(base64Data, mediaType, prompt, model);
   }
-  return extrairComOpenAI(base64Data, mediaType, prompt, model);
+  const first = parsedList.length === 1 ? parsedList[0] : parsedList;
+  return mapResult(first);
+}
+
+async function extrairComOpenAIRaw(
+  base64Data: string,
+  mediaType: string,
+  prompt: string,
+  model: string
+): Promise<unknown[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY não configurada.");
+  }
+  const openai = new OpenAI({ apiKey });
+  const response = await openai.chat.completions.create({
+    model,
+    max_tokens: 4000,
+    messages: [
+      { role: "system", content: "Você retorna somente JSON válido, sem texto adicional." },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:${mediaType};base64,${base64Data}` } },
+        ],
+      },
+    ],
+  });
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("Resposta da IA vazia.");
+  const parsed = JSON.parse(
+    (() => {
+      let raw = content.trim();
+      const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlock) raw = codeBlock[1].trim();
+      return raw;
+    })()
+  );
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
+
+async function extrairComClaudeRaw(
+  base64Data: string,
+  mediaType: string,
+  prompt: string,
+  model: string
+): Promise<unknown[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: mediaType, data: base64Data },
+            },
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Claude API: ${response.status} ${errText || response.statusText}`);
+  }
+  const json = (await response.json()) as {
+    content?: Array<{ type?: string; text?: string }>;
+  };
+  const content = json.content?.find((c) => c?.type === "text")?.text;
+  if (!content) throw new Error("Resposta da Claude vazia.");
+  return parseJsonFromResponse(content);
 }

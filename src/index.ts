@@ -18,7 +18,9 @@ import {
   getPublicacaoById,
   updatePublicacao,
   recriarPrazosPublicacao,
+  criarProcessoDePublicacao,
 } from "./routes/publicacoes.js";
+import { processoPorDocumento } from "./routes/processos-por-documento.js";
 import { dispararAnaliseN8n } from "./routes/publicacoes-disparar-n8n.js";
 import { publicacaoPorPrint } from "./routes/publicacoes-por-print.js";
 import { login } from "./routes/auth.js";
@@ -38,6 +40,7 @@ import {
   enriquecerProcessosComEscavador,
   popularMovimentacoesPublicacoes,
   popularMovimentacoesEscavador,
+  vincularPublicacoesOrfas,
 } from "./routes/processos.js";
 import { importarExcelProcessos } from "./routes/processos-importar.js";
 import {
@@ -103,6 +106,7 @@ app.get("/api/publicacoes", listPublicacoes);
 app.get("/api/publicacoes/:id", getPublicacaoById);
 app.patch("/api/publicacoes/:id", updatePublicacao);
 app.post("/api/publicacoes/:id/recriar-prazos", requireAuth, recriarPrazosPublicacao);
+app.post("/api/publicacoes/:id/criar-processo", requireAuth, criarProcessoDePublicacao);
 app.post("/api/publicacoes/:id/disparar-analise-n8n", requireAuth, dispararAnaliseN8n);
 app.post("/api/publicacoes/por-print", requireAuth, publicacaoPorPrint);
 
@@ -125,6 +129,8 @@ app.post("/api/processos/enriquecer-escavador", requireAuth, enriquecerProcessos
 app.get("/api/processos/:id", requireAuth, getProcessoById);
 app.post("/api/processos/:id/popular-movimentacoes-publicacoes", requireAuth, popularMovimentacoesPublicacoes);
 app.post("/api/processos/:id/popular-movimentacoes-escavador", requireAuth, popularMovimentacoesEscavador);
+app.post("/api/processos/por-documento", requireAuth, processoPorDocumento);
+app.post("/api/processos/vincular-publicacoes-orfas", requireAuth, vincularPublicacoesOrfas);
 app.post("/api/processos", requireAuth, createProcesso);
 app.patch("/api/processos/:id", requireAuth, updateProcesso);
 app.post("/api/processos/importar-excel", requireAuth, importarExcelProcessos);

@@ -5,6 +5,8 @@ import {
   getPublicacao,
   updatePublicacao,
   dispararAnaliseN8n,
+  recriarPrazosPublicacao,
+  criarProcessoDePublicacao,
   type PublicacaoDetalhe,
 } from "@/lib/api";
 
@@ -153,6 +155,23 @@ export function DetalhePublicacao() {
     },
   });
 
+  const recriarPrazosMutation = useMutation({
+    mutationFn: () => recriarPrazosPublicacao(pubId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publicacao", pubId] });
+      queryClient.invalidateQueries({ queryKey: ["publicacoes"] });
+      queryClient.invalidateQueries({ queryKey: ["prazos"] });
+    },
+  });
+
+  const criarProcessoMutation = useMutation({
+    mutationFn: () => criarProcessoDePublicacao(pubId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publicacao", pubId] });
+      queryClient.invalidateQueries({ queryKey: ["processos"] });
+    },
+  });
+
   const handleSave = () => {
     mutation.mutate(form);
   };
@@ -227,6 +246,15 @@ export function DetalhePublicacao() {
           <div className="flex shrink-0 flex-wrap gap-2">
             <button
               type="button"
+              onClick={() => recriarPrazosMutation.mutate()}
+              disabled={recriarPrazosMutation.isPending}
+              className="rounded-lg border border-amber-600/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-100"
+              title="Recalcula prazos com a regra do escritório (5 dias fatal / 3 no calendário quando não há prazo específico)."
+            >
+              {recriarPrazosMutation.isPending ? "Recalculando…" : "Recalcular prazos"}
+            </button>
+            <button
+              type="button"
               onClick={() => analiseN8nMutation.mutate()}
               disabled={analiseN8nMutation.isPending}
               className="rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
@@ -277,6 +305,54 @@ export function DetalhePublicacao() {
         <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
           {analiseN8nMutation.error instanceof Error ? analiseN8nMutation.error.message : "Erro ao enviar para o N8N."}
         </div>
+      )}
+      {recriarPrazosMutation.isSuccess && (
+        <div className="rounded-lg border border-amber-600/30 bg-amber-500/5 p-3 text-sm text-foreground">
+          Prazos recalculados ({recriarPrazosMutation.data?.prazoIds?.length ?? 0} no calendário).
+        </div>
+      )}
+      {recriarPrazosMutation.isError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
+          {recriarPrazosMutation.error instanceof Error
+            ? recriarPrazosMutation.error.message
+            : "Erro ao recalcular prazos."}
+        </div>
+      )}
+
+      {pub.numeroProcesso && !pub.processoId && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-foreground">
+            Esta publicação ainda não está vinculada a um processo no cadastro. Novas publicações passam a
+            criar o processo automaticamente; para esta, vincule agora.
+          </p>
+          <button
+            type="button"
+            onClick={() => criarProcessoMutation.mutate()}
+            disabled={criarProcessoMutation.isPending}
+            className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {criarProcessoMutation.isPending ? "Vinculando…" : "Criar / vincular processo"}
+          </button>
+        </div>
+      )}
+      {criarProcessoMutation.isSuccess && (
+        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
+          {criarProcessoMutation.data?.message}{" "}
+          <Link
+            to={`/processos/${criarProcessoMutation.data?.processoId}`}
+            className="font-medium text-primary underline"
+          >
+            Abrir processo
+          </Link>
+        </div>
+      )}
+      {pub.processoId && (
+        <p className="text-sm text-muted-foreground">
+          Processo vinculado:{" "}
+          <Link to={`/processos/${pub.processoId}`} className="text-primary underline">
+            {pub.processoNumeroCnj ?? `#${pub.processoId}`}
+          </Link>
+        </p>
       )}
 
       <div className="grid gap-8 lg:grid-cols-2">

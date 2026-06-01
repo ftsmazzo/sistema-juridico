@@ -268,6 +268,8 @@ export type PublicacaoDetalhe = {
   prazoDiasUteisSugerido: number | null;
   observacoesIa: string | null;
   movimentacoes: { tipo: string; resumo: string }[] | null;
+  processoId: number | null;
+  processoNumeroCnj: string | null;
   createdAt: string;
 };
 
@@ -287,6 +289,51 @@ export function dispararAnaliseN8n(id: number) {
   return api.post<{ ok: boolean; message: string }>(
     `/api/publicacoes/${id}/disparar-analise-n8n`
   );
+}
+
+export function recriarPrazosPublicacao(id: number) {
+  return api.post<{ ok: boolean; prazoIds: number[] }>(
+    `/api/publicacoes/${id}/recriar-prazos`
+  );
+}
+
+export function criarProcessoDePublicacao(id: number) {
+  return api.post<{
+    ok: boolean;
+    processoId: number;
+    criado: boolean;
+    message: string;
+  }>(`/api/publicacoes/${id}/criar-processo`);
+}
+
+export type ProcessoPorDocumentoResponse = {
+  processoId: number;
+  criado: boolean;
+  numeroCnj: string;
+  publicacoesVinculadas: number;
+  message: string;
+  extraido?: Record<string, unknown>;
+};
+
+export function vincularPublicacoesOrfasProcessos() {
+  return api.post<{
+    ok: boolean;
+    analisadas: number;
+    processosCriados: number;
+    publicacoesVinculadas: number;
+    message: string;
+  }>("/api/processos/vincular-publicacoes-orfas");
+}
+
+export function cadastrarProcessoPorDocumento(
+  imageBase64: string,
+  opcoes?: { provider?: ProvedorIa; model?: string }
+) {
+  return api.post<ProcessoPorDocumentoResponse>("/api/processos/por-documento", {
+    image: imageBase64,
+    ...(opcoes?.provider && { provider: opcoes.provider }),
+    ...(opcoes?.model && { model: opcoes.model }),
+  });
 }
 
 /** Configuração do monitoramento de e-mail (IMAP). Uma conta. */

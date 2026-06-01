@@ -13,6 +13,7 @@ import {
 import { eq, ilike, and, or, asc, desc, sql, lt, lte, gt, isNull, inArray } from "drizzle-orm";
 import type { RequestWithUser } from "../middleware/auth.js";
 import { podeCadastrarPessoas } from "../lib/roles.js";
+import { garantirProcessoParaPublicacao } from "../lib/vincular-publicacao-processo.js";
 
 export type ProcessoListItem = {
   id: number;
@@ -595,5 +596,49 @@ export async function enriquecerProcessosComEscavador(
   } catch (err) {
     console.error("Enriquecer processos com Escavador:", err);
     res.status(500).json({ error: "Erro ao enriquecer processos com dados do Escavador." });
+  }
+}
+
+/**
+ * POST /api/processos/vincular-publicacoes-orfas
+ * Cria processo mínimo e vincula publicações/prazos que têm CNJ mas ainda sem processo_id.
+ */
+export async function vincularPublicacoesOrfas(
+  req: RequestWithUser,
+  res: Response
+): Promise<void> {
+  if (!req.user || !podeCadastrarPessoas(req.user.perfil, req.user.grupo)) {
+    res.status(403).json({ error: "Sem permissão" });
+    return;
+  }
+  try {
+    const orfas = await db
+      .select({ id: publicacoesOab.id })
+      .from(publicacoesOab)
+      .where(
+        and(
+          isNull(publicacoesOab.processoId),
+          sql`trim(coalesce(${publicacoesOab.numeroProcesso}, '')) <> ''`
+        )
+      );
+
+    let processosCriados = 0;
+    let publicacoesVinculadas = 0;
+    for (const row of orfas) {
+      const r = await garantirProcessoParaPublicacao(row.id, { criarSeAusente: true });
+      if (r.criado) processosCriados++;
+      if (r.vinculado) publicacoesVinculadas++;
+    }
+
+    res.json({
+      ok: true,
+      analisadas: orfas.length,
+      processosCriados,
+      publicacoesVinculadas,
+      message: `${publicacoesVinculadas} publicação(ões) vinculada(s); ${processosCriados} processo(s) criado(s).`,
+    });
+  } catch (err) {
+    console.error("vincularPublicacoesOrfas:", err);
+    res.status(500).json({ error: "Erro ao vincular publicações órfãs." });
   }
 }
