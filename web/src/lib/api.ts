@@ -403,17 +403,6 @@ export function vincularPublicacoesOrfasProcessos() {
   }>("/api/processos/vincular-publicacoes-orfas");
 }
 
-export function cadastrarProcessoPorDocumento(
-  imageBase64: string,
-  opcoes?: { provider?: ProvedorIa; model?: string }
-) {
-  return api.post<ProcessoPorDocumentoResponse>("/api/processos/por-documento", {
-    image: imageBase64,
-    ...(opcoes?.provider && { provider: opcoes.provider }),
-    ...(opcoes?.model && { model: opcoes.model }),
-  });
-}
-
 /** Configuração do monitoramento de e-mail (IMAP). Uma conta. */
 export type EmailMonitorConfig = {
   id: number;
